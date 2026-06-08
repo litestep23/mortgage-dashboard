@@ -4,53 +4,64 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Mortgage Dashboard</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/recharts@2.7.3/umd/Recharts.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react":            "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "htm/react":        "https://esm.sh/htm@3.1.1/react",
+    "recharts":         "https://esm.sh/recharts@2.12.7?external=react,react-dom"
+  }
+}
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Mulish:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-  *,*::before,*::after{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:#07090f;min-height:100vh;}
-  input,select,textarea{font-family:'Mulish',sans-serif;}
-  input:focus,select:focus,textarea:focus{outline:none!important;border-color:rgba(56,189,248,0.5)!important;}
-  input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;cursor:pointer;}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;border:2px solid #07090f;cursor:pointer;}
-  ::-webkit-scrollbar{width:5px;height:5px;}
-  ::-webkit-scrollbar-track{background:transparent;}
-  ::-webkit-scrollbar-thumb{background:#1e2535;border-radius:4px;}
-  table{width:100%;border-collapse:collapse;}
-  th{font-size:10px;color:#4b5674;text-transform:uppercase;letter-spacing:1.2px;padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);}
-  td{padding:10px;font-size:13px;color:#e2e8f5;border-bottom:1px solid rgba(255,255,255,0.04);}
-  tr:hover td{background:rgba(255,255,255,0.02);}
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:#07090f;min-height:100vh;}
+input,select,textarea{font-family:'Mulish',sans-serif;color:#e2e8f5;}
+input:focus,select:focus,textarea:focus{outline:none!important;border-color:rgba(56,189,248,0.5)!important;}
+input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;border:2px solid #07090f;cursor:pointer;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#1e2535;border-radius:4px;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:10px;color:#4b5674;text-transform:uppercase;letter-spacing:1.2px;padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06);}
+td{padding:10px;font-size:13px;color:#e2e8f5;border-bottom:1px solid rgba(255,255,255,0.04);}
+tr:hover td{background:rgba(255,255,255,0.02);}
+button{font-family:'Mulish',sans-serif;cursor:pointer;}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useMemo, useRef } = React;
-const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } = Recharts;
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#4b5674;font-family:sans-serif;font-size:14px">Loading dashboard…</div></div>
+<script type="module">
+import { useState, useEffect, useMemo } from 'react';
+import { createRoot } from 'react-dom/client';
+import html from 'htm/react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-// ─── STORAGE KEY ─────────────────────────────────────────────────────────────
-const SK = "mortgageDashV1";
+// ── STORAGE ──────────────────────────────────────────────────────────────────
+const SK = 'mortgageDashV1';
+const load = () => { try { const r=localStorage.getItem(SK); return r?JSON.parse(r):null; } catch{return null;} };
+const save = d => { try { localStorage.setItem(SK,JSON.stringify(d)); } catch(e){console.error(e);} };
 
-// ─── DEFAULT DATA (pre-filled with Ryan's details) ───────────────────────────
+// ── DEFAULTS ─────────────────────────────────────────────────────────────────
 const INIT = {
-  loan: { balance:0, offset:0, rate:6.04, payment:0, origBalance:0, origEnd:"2051-09" },
+  loan: { balance:0, offset:0, rate:6.04, payment:0, origBalance:0, origEnd:'2051-09' },
   strategy: { extraMonthly:0, fortnightly:false, annualLump:0 },
   history: [],
   repayments: [],
 };
 
-// ─── UTILS ───────────────────────────────────────────────────────────────────
-const fmtA = n => !isFinite(n)?'—':new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(n);
-const fmtD = m => { if(!isFinite(m)||m>900)return'—'; const d=new Date(); d.setMonth(d.getMonth()+Math.round(m)); return d.toLocaleDateString('en-AU',{month:'short',year:'numeric'}); };
-const fmtY = m => { if(!isFinite(m)||m>900||m<0)return'—'; const y=Math.floor(m/12),mo=Math.round(m%12); if(y===0)return`${mo}mo`; if(mo===0)return`${y}y`; return`${y}y ${mo}mo`; };
+// ── UTILS ────────────────────────────────────────────────────────────────────
+const fA = n => !isFinite(n)?'—':new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(n);
+const fD = m => { if(!isFinite(m)||m>900)return'—'; const d=new Date(); d.setMonth(d.getMonth()+Math.round(m)); return d.toLocaleDateString('en-AU',{month:'short',year:'numeric'}); };
+const fY = m => { if(!isFinite(m)||m>900||m<0)return'—'; const y=Math.floor(m/12),mo=Math.round(m%12); return y===0?`${mo}mo`:mo===0?`${y}y`:`${y}y ${mo}mo`; };
 const nowYM = () => { const d=new Date(); return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
 const gid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const fmtMo = s => { if(!s)return''; const [y,m]=s.split('-'); return new Date(+y,+m-1).toLocaleDateString('en-AU',{month:'short',year:'numeric'}); };
+const fMo = s => { if(!s)return''; const [y,m]=s.split('-'); return new Date(+y,+m-1).toLocaleDateString('en-AU',{month:'short',year:'numeric'}); };
 
-// ─── AMORTIZE ────────────────────────────────────────────────────────────────
+// ── AMORTIZE ─────────────────────────────────────────────────────────────────
 function amort({balance,offset,ratePA,pmt,ppy=12,lump=0}) {
   const r=ratePA/100/ppy; let bal=balance,ti=0,p=0;
   const pts=[{y:0,b:Math.round(bal)}];
@@ -66,682 +77,556 @@ function amort({balance,offset,ratePA,pmt,ppy=12,lump=0}) {
   return{months:ppy===12?p:Math.round(p/ppy*12),totalInt:ti,pts};
 }
 
-// ─── COLORS ──────────────────────────────────────────────────────────────────
+// ── COLOURS & SHARED STYLES ──────────────────────────────────────────────────
 const C={bg:'#07090f',surf:'#0c1018',surf2:'#111827',border:'rgba(255,255,255,0.07)',text:'#e2e8f5',muted:'#4b5674',green:'#00d68f',blue:'#38bdf8',amber:'#fbbf24',red:'#f87171',purple:'#c084fc',orange:'#fb923c'};
-const inp={background:C.surf2,border:`1px solid rgba(255,255,255,0.12)`,borderRadius:8,color:C.text,fontSize:13,padding:'8px 10px',width:'100%'};
-const Btn=(bg,label,onClick,style={})=><button onClick={onClick} style={{padding:'9px 18px',borderRadius:8,border:'none',background:bg,color:bg===C.surf2?C.text:'#07090f',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:"'Mulish',sans-serif",...style}}>{label}</button>;
-const GhostBtn=(col,label,onClick)=><button onClick={onClick} style={{padding:'7px 14px',borderRadius:7,border:`1px solid ${col}50`,background:`${col}12`,color:col,fontWeight:600,fontSize:12,cursor:'pointer',fontFamily:"'Mulish',sans-serif"}}>{label}</button>;
+const inp={background:C.surf2,border:'1px solid rgba(255,255,255,0.12)',borderRadius:8,color:C.text,fontSize:13,padding:'8px 10px',width:'100%'};
 
-// ─── SECTION HEADER ─────────────────────────────────────────────────────────
-const SH=({e,t,sub})=><div style={{marginBottom:18}}><h2 style={{fontFamily:"'Syne',sans-serif",fontSize:17,fontWeight:700,margin:'0 0 4px',display:'flex',alignItems:'center',gap:8}}><span>{e}</span>{t}</h2>{sub&&<p style={{fontSize:12,color:C.muted,margin:0,lineHeight:1.6}}>{sub}</p>}</div>;
+// ── TINY COMPONENTS ──────────────────────────────────────────────────────────
+const Stat = ({l,v,sub,accent}) => html`
+  <div style=${{flex:'1 1 130px',padding:'14px 16px',background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`,borderTop:`2px solid ${accent}`,borderRadius:13}}>
+    <div style=${{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.4,marginBottom:5}}>${l}</div>
+    <div style=${{fontFamily:"'DM Mono',monospace",fontSize:18,fontWeight:700,color:C.text}}>${v}</div>
+    ${sub && html`<div style=${{fontSize:11,color:C.muted,marginTop:3}}>${sub}</div>`}
+  </div>`;
 
-// ─── STAT CARD ───────────────────────────────────────────────────────────────
-const Stat=({l,v,sub,col=C.text,mono=true,accent})=>(
-  <div style={{flex:'1 1 130px',padding:'14px 16px',background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`,borderTop:`2px solid ${accent||col}`,borderRadius:13}}>
-    <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.4,marginBottom:5}}>{l}</div>
-    <div style={{fontFamily:mono?"'DM Mono',monospace":"'Mulish',sans-serif",fontSize:18,fontWeight:700,color:col}}>{v}</div>
-    {sub&&<div style={{fontSize:11,color:C.muted,marginTop:3}}>{sub}</div>}
-  </div>
-);
+const SH = ({e,t,sub}) => html`
+  <div style=${{marginBottom:18}}>
+    <h2 style=${{fontFamily:"'Syne',sans-serif",fontSize:17,fontWeight:700,margin:'0 0 4px',display:'flex',alignItems:'center',gap:8}}>
+      <span>${e}</span>${t}
+    </h2>
+    ${sub && html`<p style=${{fontSize:12,color:C.muted,margin:0,lineHeight:1.6}}>${sub}</p>`}
+  </div>`;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DASHBOARD TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-function DashTab({data,setTab}) {
+const KV = ({l,v,c}) => html`
+  <div style=${{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid ${C.border}`}}>
+    <span style=${{fontSize:12,color:C.muted}}>${l}</span>
+    <span style=${{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:600,color:c||C.text}}>${v}</span>
+  </div>`;
+
+// ── DASHBOARD TAB ────────────────────────────────────────────────────────────
+function DashTab({data, setTab}) {
   const hist = data.history;
   const latest = hist.length>0 ? hist[hist.length-1] : data.loan;
-  const {balance:bal,offset:off,rate} = latest;
-  const eff = Math.max(0,bal-off);
-  const annualSave = off*rate/100;
-  const dailySave  = off*rate/100/365;
+  const {balance:bal, offset:off, rate} = latest;
+  const eff = Math.max(0, bal-off);
   const strat = data.strategy;
-  const pmt = strat.fortnightly ? (data.loan.payment+strat.extraMonthly)/2 : (data.loan.payment+strat.extraMonthly);
-  const ppy = strat.fortnightly ? 26 : 12;
-  const proj = useMemo(()=>amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump:strat.annualLump}),[bal,off,rate,pmt,ppy,strat.annualLump]);
-  const base = useMemo(()=>amort({balance:bal,offset:off,ratePA:rate,pmt:data.loan.payment,ppy:12}),[bal,off,rate,data.loan.payment]);
-  const origBal = data.loan.origBalance||0;
-  const paidPct = ((origBal-bal)/origBal*100).toFixed(1);
-  const startBal = hist.length>0 ? hist[0].balance : bal;
-  const dropped = startBal-bal;
+  const pmt = strat.fortnightly?(data.loan.payment+strat.extraMonthly)/2:(data.loan.payment+strat.extraMonthly);
+  const ppy = strat.fortnightly?26:12;
+  const proj = useMemo(()=>bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump:strat.annualLump}):{months:Infinity,totalInt:Infinity,pts:[]},[bal,off,rate,pmt,ppy,strat.annualLump]);
+  const base = useMemo(()=>bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:data.loan.payment||5832,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]},[bal,off,rate,data.loan.payment]);
+  const origBal = data.loan.origBalance||bal||1;
+  const paidPct = origBal>0 ? ((origBal-bal)/origBal*100).toFixed(1) : '0.0';
+  const dropped = hist.length>0 ? (hist[0].balance - bal) : 0;
   const totalExtra = data.repayments.reduce((s,r)=>s+r.amount,0);
-  const monthsSaved = isFinite(base.months)&&isFinite(proj.months) ? base.months-proj.months : 0;
+  const moSaved = isFinite(base.months)&&isFinite(proj.months)?base.months-proj.months:0;
+  const annualSave = off*rate/100;
 
-  // Original end Sep 2051 from Jun 2026 = ~303 months; adjust for current date
-  const now = new Date();
-  const origEndMonths = Math.round((new Date(2051,8)-now)/1000/60/60/24/30.44);
-
-  // Chart
   const chartData = useMemo(()=>{
-    const histMap={};
-    hist.forEach(h=>{ const yr=h.month ? parseInt(h.month.split('-')[0])-new Date().getFullYear() : 0; if(yr>=0) histMap[yr]=h.balance; });
-    const projMap={}, baseMap={};
+    const baseYear = new Date().getFullYear();
+    const histMap={}, projMap={}, baseMap={};
+    hist.forEach(h=>{ const yr=h.month?parseInt(h.month.split('-')[0])-baseYear:0; if(yr>=0)histMap[yr]=h.balance; });
     proj.pts.forEach(p=>projMap[p.y]=p.b);
     base.pts.forEach(p=>baseMap[p.y]=p.b);
     return Array.from({length:31},(_,y)=>{
-      const pt={year:y,label:String(new Date().getFullYear()+y)};
-      if(histMap[y]!==undefined) pt.actual=histMap[y];
-      if(projMap[y]!==undefined) pt.projected=projMap[y];
-      else if(isFinite(proj.months)&&y>proj.months/12) pt.projected=0;
-      if(baseMap[y]!==undefined) pt.noExtra=baseMap[y];
-      else if(isFinite(base.months)&&y>base.months/12) pt.noExtra=0;
+      const pt={year:y,label:String(baseYear+y)};
+      if(histMap[y]!==undefined)pt.actual=histMap[y];
+      if(projMap[y]!==undefined)pt.projected=projMap[y];
+      else if(isFinite(proj.months)&&y>proj.months/12)pt.projected=0;
+      if(baseMap[y]!==undefined)pt.noExtra=baseMap[y];
+      else if(isFinite(base.months)&&y>base.months/12)pt.noExtra=0;
       return pt;
     });
   },[hist,proj,base]);
 
-  return (
-    <div>
-      {/* Stats row */}
-      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
-        <Stat l="Current Balance"    v={fmtA(bal)}       accent={C.red}    sub={`as of ${hist.length>0?fmtMo(latest.month):'now'}`}/>
-        <Stat l="Effective Balance"  v={fmtA(eff)}       accent={C.blue}   sub={`Offset: ${fmtA(off)}`}/>
-        <Stat l="Interest Rate"      v={`${rate}% p.a.`} accent={C.amber}  mono={false}/>
-        <Stat l="Offset Saves / Year" v={fmtA(annualSave)} accent={C.green} sub={`${fmtA(dailySave)}/day`}/>
-      </div>
+  if(!bal) return html`
+    <div style=${{textAlign:'center',padding:'60px 20px',color:C.muted}}>
+      <div style=${{fontSize:40,marginBottom:16}}>🏠</div>
+      <div style=${{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:700,color:C.text,marginBottom:8}}>Welcome to your Mortgage Dashboard</div>
+      <p style=${{fontSize:14,lineHeight:1.7,marginBottom:24}}>Start by entering your loan details in Settings,<br/>then record your first month in History.</p>
+      <button onClick=${()=>setTab('sett')} style=${{padding:'10px 24px',borderRadius:8,border:'none',background:C.blue,color:'#07090f',fontWeight:700,fontSize:14}}>⚙️ Go to Settings</button>
+    </div>`;
 
-      {/* Progress + quick actions */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:20}}>
-        <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:20}}>
-          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:16}}>Loan Progress</div>
-          {/* Progress bar */}
-          <div style={{background:'rgba(255,255,255,0.06)',borderRadius:999,height:8,marginBottom:10,overflow:'hidden'}}>
-            <div style={{width:`${paidPct}%`,height:'100%',background:`linear-gradient(90deg,${C.green},${C.blue})`,borderRadius:999,transition:'width 0.5s'}}/>
-          </div>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:12,color:C.muted,marginBottom:16}}>
-            <span>0</span><span style={{color:C.text,fontWeight:700}}>{paidPct}% paid off</span><span>{fmtA(origBal)}</span>
-          </div>
-          {[
-            ['Original balance', fmtA(origBal)],
-            ['Balance reduced', fmtA(dropped), C.green],
-            ['Extra repayments logged', fmtA(totalExtra), C.green],
-            ['Entries tracked', `${hist.length} months`],
-          ].map(([l,v,c])=>(
-            <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:`1px solid ${C.border}`}}>
-              <span style={{fontSize:12,color:C.muted}}>{l}</span>
-              <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:600,color:c||C.text}}>{v}</span>
-            </div>
-          ))}
+  return html`<div>
+    <div style=${{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
+      <${Stat} l="Current Balance"     v=${fA(bal)}           accent=${C.red}    sub=${`as of ${hist.length>0?fMo(latest.month):'now'}`}/>
+      <${Stat} l="Effective Balance"   v=${fA(eff)}           accent=${C.blue}   sub=${`Offset: ${fA(off)}`}/>
+      <${Stat} l="Interest Rate"       v=${`${rate}% p.a.`}   accent=${C.amber}/>
+      <${Stat} l="Offset Saves / Year" v=${fA(annualSave)}    accent=${C.green}  sub=${`${fA(off*rate/100/365)}/day`}/>
+    </div>
+
+    <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:20}}>
+      <div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:20}}>
+        <div style=${{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:14}}>Loan Progress</div>
+        <div style=${{background:'rgba(255,255,255,0.06)',borderRadius:999,height:8,marginBottom:8,overflow:'hidden'}}>
+          <div style=${{width:`${paidPct}%`,height:'100%',background:`linear-gradient(90deg,${C.green},${C.blue})`,borderRadius:999}}/>
         </div>
-
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          {/* This month */}
-          <div style={{background:'linear-gradient(135deg,rgba(0,214,143,0.08),rgba(56,189,248,0.04))',border:'1px solid rgba(0,214,143,0.2)',borderRadius:18,padding:18}}>
-            <div style={{fontSize:11,color:C.green,textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>This Month</div>
-            {[
-              ['Interest charge', fmtA(eff*rate/100/12), C.red],
-              ['Principal reduction', fmtA(data.loan.payment - eff*rate/100/12), C.green],
-              ['Daily offset saving', `${fmtA(dailySave)}/day`, C.blue],
-            ].map(([l,v,c])=>(
-              <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0'}}>
-                <span style={{fontSize:12,color:C.muted}}>{l}</span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:600,color:c}}>{v}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Projection */}
-          <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:18,flex:1}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Your Strategy Projection</div>
-            {[
-              ['Pay off', fmtD(proj.months)],
-              ['Time remaining', fmtY(proj.months)],
-              ['Vs no extras (time saved)', fmtY(monthsSaved), C.green],
-              ['Total interest (projected)', fmtA(proj.totalInt)],
-            ].map(([l,v,c])=>(
-              <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:`1px solid ${C.border}`}}>
-                <span style={{fontSize:12,color:C.muted}}>{l}</span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:c||C.text}}>{v}</span>
-              </div>
-            ))}
-          </div>
+        <div style=${{display:'flex',justifyContent:'space-between',fontSize:12,color:C.muted,marginBottom:14}}>
+          <span>0</span><span style=${{color:C.text,fontWeight:700}}>${paidPct}% paid off</span><span>${fA(origBal)}</span>
         </div>
+        <${KV} l="Balance reduced since tracking" v=${fA(dropped)} c=${C.green}/>
+        <${KV} l="Extra repayments logged"        v=${fA(totalExtra)} c=${C.green}/>
+        <${KV} l="Months tracked"                 v=${`${hist.length}`}/>
       </div>
 
-      {/* Chart */}
-      <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:22,marginBottom:20}}>
-        <div style={{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:700,marginBottom:3}}>📈 Balance Over Time</div>
-        <p style={{fontSize:12,color:C.muted,margin:'0 0 18px'}}>Actual history · Your strategy · No-extras baseline</p>
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={chartData} margin={{top:4,right:10,bottom:4,left:4}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)"/>
-            <XAxis dataKey="label" stroke="#1e2535" tick={{fill:C.muted,fontSize:10,fontFamily:"'DM Mono',monospace"}} interval={4}/>
-            <YAxis stroke="#1e2535" tick={{fill:C.muted,fontSize:10,fontFamily:"'DM Mono',monospace"}} tickFormatter={v=>`$${(v/1000).toFixed(0)}K`} width={56}/>
-            <Tooltip contentStyle={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12}} formatter={(v,n)=>[fmtA(v),n==='actual'?'Actual':n==='projected'?'Your strategy':'No extras']}/>
-            <Legend wrapperStyle={{fontSize:11}} formatter={n=>n==='actual'?'Actual':n==='projected'?'Your strategy':'No extras'}/>
-            <Line type="monotone" dataKey="noExtra" stroke={C.red} strokeWidth={1.5} strokeDasharray="4 3" dot={false} connectNulls={false}/>
-            <Line type="monotone" dataKey="projected" stroke={C.blue} strokeWidth={2} dot={false} connectNulls={false}/>
-            <Line type="monotone" dataKey="actual" stroke={C.green} strokeWidth={2.5} dot={{r:4,fill:C.green,stroke:C.bg,strokeWidth:2}} connectNulls={false}/>
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* CTA buttons */}
-      <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-        {Btn(C.green,'📅 Record This Month',()=>setTab('track'))}
-        {Btn(C.blue,'➕ Log Extra Payment',()=>setTab('extra'))}
-        {GhostBtn(C.muted,'⚙️ Update Loan Details',()=>setTab('sett'))}
+      <div style=${{display:'flex',flexDirection:'column',gap:12}}>
+        <div style=${{background:'linear-gradient(135deg,rgba(0,214,143,0.08),rgba(56,189,248,0.04))',border:'1px solid rgba(0,214,143,0.2)',borderRadius:18,padding:18}}>
+          <div style=${{fontSize:11,color:C.green,textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>This Month</div>
+          <${KV} l="Interest charge"     v=${fA(eff*rate/100/12)} c=${C.red}/>
+          <${KV} l="Principal reduction" v=${fA((data.loan.payment||0)-eff*rate/100/12)} c=${C.green}/>
+          <${KV} l="Daily offset saving" v=${`${fA(off*rate/100/365)}/day`} c=${C.blue}/>
+        </div>
+        <div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:18,flex:1}}>
+          <div style=${{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Strategy Projection</div>
+          <${KV} l="Pay off"             v=${fD(proj.months)}/>
+          <${KV} l="Time remaining"      v=${fY(proj.months)}/>
+          <${KV} l="Time saved vs base"  v=${moSaved>0?fY(moSaved)+' sooner':'—'} c=${C.green}/>
+          <${KV} l="Total interest"      v=${fA(proj.totalInt)}/>
+        </div>
       </div>
     </div>
-  );
+
+    <div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:22,marginBottom:20}}>
+      <div style=${{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:700,marginBottom:3}}>📈 Balance Over Time</div>
+      <p style=${{fontSize:12,color:C.muted,margin:'0 0 18px'}}>Actual history · Your strategy · No-extras baseline</p>
+      <${ResponsiveContainer} width="100%" height=${240}>
+        <${LineChart} data=${chartData} margin=${{top:4,right:10,bottom:4,left:4}}>
+          <${CartesianGrid} strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)"/>
+          <${XAxis} dataKey="label" stroke="#1e2535" tick=${{fill:C.muted,fontSize:10}} interval=${4}/>
+          <${YAxis} stroke="#1e2535" tick=${{fill:C.muted,fontSize:10}} tickFormatter=${v=>`$${(v/1000).toFixed(0)}K`} width=${56}/>
+          <${Tooltip} contentStyle=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12}} formatter=${(v,n)=>[fA(v),n==='actual'?'Actual':n==='projected'?'Strategy':'No extras']}/>
+          <${Legend} wrapperStyle=${{fontSize:11}} formatter=${n=>n==='actual'?'Actual':n==='projected'?'Strategy':'No extras'}/>
+          <${Line} type="monotone" dataKey="noExtra"   stroke=${C.red}   strokeWidth=${1.5} strokeDasharray="4 3" dot=${false} connectNulls=${false}/>
+          <${Line} type="monotone" dataKey="projected" stroke=${C.blue}  strokeWidth=${2}   dot=${false} connectNulls=${false}/>
+          <${Line} type="monotone" dataKey="actual"    stroke=${C.green} strokeWidth=${2.5} dot=${{r:4,fill:C.green,stroke:C.bg,strokeWidth:2}} connectNulls=${false}/>
+        </${LineChart}>
+      </${ResponsiveContainer}>
+    </div>
+
+    <div style=${{display:'flex',gap:12,flexWrap:'wrap'}}>
+      <button onClick=${()=>setTab('track')} style=${{padding:'9px 18px',borderRadius:8,border:'none',background:C.green,color:'#07090f',fontWeight:700,fontSize:13}}>📅 Record This Month</button>
+      <button onClick=${()=>setTab('extra')} style=${{padding:'9px 18px',borderRadius:8,border:'none',background:C.blue,color:'#07090f',fontWeight:700,fontSize:13}}>➕ Log Extra Payment</button>
+      <button onClick=${()=>setTab('sett')} style=${{padding:'9px 18px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,fontWeight:600,fontSize:13}}>⚙️ Settings</button>
+    </div>
+  </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HISTORY TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-function TrackTab({data,update}) {
+// ── HISTORY TAB ──────────────────────────────────────────────────────────────
+function TrackTab({data, update}) {
   const [bal,  setBal]  = useState('');
   const [off,  setOff]  = useState('');
   const [rate, setRate] = useState(String(data.loan.rate));
   const [note, setNote] = useState('');
   const [month,setMonth]= useState(nowYM());
-  const [edit, setEdit] = useState(null); // editing row id
 
   const addEntry = () => {
-    const b=parseFloat(bal.replace(/[^0-9.]/g,'')||data.loan.balance);
-    const o=parseFloat(off.replace(/[^0-9.]/g,'')||data.loan.offset);
-    const r=parseFloat(rate||data.loan.rate);
+    const b=parseFloat(bal.replace(/[^0-9.]/g,'')); 
+    const o=parseFloat(off.replace(/[^0-9.]/g,''));
+    const r=parseFloat(rate);
     if(!b||!o||!r) return;
-    const entry={id:gid(),month,balance:b,offset:o,rate:r,note:note.trim()};
     update(d=>{
-      const existing=d.history.findIndex(h=>h.month===month);
-      if(existing>=0) d.history[existing]={...d.history[existing],...entry,id:d.history[existing].id};
-      else d.history=[...d.history,entry].sort((a,b_)=>a.month.localeCompare(b_.month));
+      const entry={id:gid(),month,balance:b,offset:o,rate:r,note:note.trim()};
+      const idx=d.history.findIndex(h=>h.month===month);
+      if(idx>=0) d.history[idx]={...d.history[idx],...entry,id:d.history[idx].id};
+      else d.history=[...d.history,entry].sort((a,b)=>a.month.localeCompare(b.month));
       d.loan.balance=b; d.loan.offset=o; d.loan.rate=r;
     });
     setBal(''); setOff(''); setNote(''); setMonth(nowYM());
   };
 
-  const removeEntry = id => update(d=>{ d.history=d.history.filter(h=>h.id!==id); });
+  const del = id => update(d=>{ d.history=d.history.filter(h=>h.id!==id); });
+  const sorted=[...data.history].sort((a,b)=>b.month.localeCompare(a.month));
 
-  const sorted = [...data.history].sort((a,b)=>b.month.localeCompare(a.month));
-
-  return (
-    <div>
-      <SH e="📅" t="Monthly Balance Tracker" sub="Record your loan balance and offset each month to track your progress over time."/>
-
-      {/* Quick add form */}
-      <div style={{background:'linear-gradient(135deg,rgba(56,189,248,0.07),rgba(192,132,252,0.03))',border:'1px solid rgba(56,189,248,0.2)',borderRadius:18,padding:22,marginBottom:24}}>
-        <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:16}}>Add / Update a Month</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:14}}>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Month</label>
-            <input type="month" value={month} onChange={e=>setMonth(e.target.value)} style={inp}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Loan Balance</label>
-            <input placeholder={fmtA(data.loan.balance)} value={bal} onChange={e=>setBal(e.target.value)} style={inp}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Offset Balance</label>
-            <input placeholder={fmtA(data.loan.offset)} value={off} onChange={e=>setOff(e.target.value)} style={inp}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Rate (% p.a.)</label>
-            <input type="number" step="0.01" value={rate} onChange={e=>setRate(e.target.value)} style={inp}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Note (optional)</label>
-            <input placeholder="e.g. Rate dropped to 5.8%" value={note} onChange={e=>setNote(e.target.value)} style={inp}/>
-          </div>
+  return html`<div>
+    <${SH} e="📅" t="Monthly Balance Tracker" sub="Record your loan balance and offset each month to track your progress over time."/>
+    <div style=${{background:'linear-gradient(135deg,rgba(56,189,248,0.07),rgba(192,132,252,0.03))',border:'1px solid rgba(56,189,248,0.2)',borderRadius:18,padding:22,marginBottom:24}}>
+      <div style=${{fontSize:13,fontWeight:700,color:C.blue,marginBottom:16}}>Add / Update a Month</div>
+      <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))',gap:12,marginBottom:14}}>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Month</label>
+          <input type="month" value=${month} onInput=${e=>setMonth(e.target.value)} style=${inp}/>
         </div>
-        {Btn(C.green,'✓ Save Entry', addEntry)}
-        <p style={{fontSize:11,color:C.muted,marginTop:10,marginBottom:0}}>If the month already exists it will be updated. Balance and offset fields accept any number format (e.g. 750000 or 750,000).</p>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Loan Balance ($)</label>
+          <input placeholder="e.g. 920000" value=${bal} onInput=${e=>setBal(e.target.value)} style=${inp}/>
+        </div>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Offset Balance ($)</label>
+          <input placeholder="e.g. 80000" value=${off} onInput=${e=>setOff(e.target.value)} style=${inp}/>
+        </div>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Rate (% p.a.)</label>
+          <input type="number" step="0.01" value=${rate} onInput=${e=>setRate(e.target.value)} style=${inp}/>
+        </div>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Note (optional)</label>
+          <input placeholder="Rate drop, bonus paid, etc." value=${note} onInput=${e=>setNote(e.target.value)} style=${inp}/>
+        </div>
       </div>
+      <button onClick=${addEntry} style=${{padding:'9px 20px',borderRadius:8,border:'none',background:C.green,color:'#07090f',fontWeight:700,fontSize:13}}>✓ Save Entry</button>
+      <p style=${{fontSize:11,color:C.muted,marginTop:10,marginBottom:0}}>If the month already exists it updates in place. Updating also refreshes your current loan details.</p>
+    </div>
 
-      {/* History table */}
-      {sorted.length === 0 ? (
-        <div style={{textAlign:'center',padding:'40px 0',color:C.muted,fontSize:13}}>No entries yet — add your first month above ↑</div>
-      ) : (
-        <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,overflow:'hidden'}}>
-          <div style={{overflowX:'auto'}}>
+    ${sorted.length===0
+      ? html`<div style=${{textAlign:'center',padding:'40px 0',color:C.muted,fontSize:13}}>No entries yet — add your first month above ↑</div>`
+      : html`<div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,overflow:'hidden'}}>
+          <div style=${{overflowX:'auto'}}>
             <table>
-              <thead><tr>
-                <th>Month</th><th>Balance</th><th>Offset</th><th>Effective</th><th>Rate</th><th>Change</th><th>Note</th><th></th>
-              </tr></thead>
+              <thead><tr><th>Month</th><th>Balance</th><th>Offset</th><th>Effective</th><th>Rate</th><th>Change</th><th>Note</th><th></th></tr></thead>
               <tbody>
-                {sorted.map((h,i)=>{
+                ${sorted.map((h,i)=>{
                   const next=sorted[i+1];
-                  const change=next ? h.balance-next.balance : null;
-                  const eff=Math.max(0,h.balance-h.offset);
-                  return(
-                    <tr key={h.id}>
-                      <td><span style={{fontFamily:"'DM Mono',monospace",fontWeight:600}}>{fmtMo(h.month)}</span></td>
-                      <td style={{fontFamily:"'DM Mono',monospace"}}>{fmtA(h.balance)}</td>
-                      <td style={{fontFamily:"'DM Mono',monospace",color:C.green}}>{fmtA(h.offset)}</td>
-                      <td style={{fontFamily:"'DM Mono',monospace",color:C.blue}}>{fmtA(eff)}</td>
-                      <td style={{fontFamily:"'DM Mono',monospace"}}>{h.rate}%</td>
-                      <td>
-                        {change!==null&&<span style={{fontFamily:"'DM Mono',monospace",color:change>0?C.green:C.red,fontWeight:600}}>
-                          {change>0?'↓':change<0?'↑':'–'}{change!==0?fmtA(Math.abs(change)):''}
-                        </span>}
-                      </td>
-                      <td style={{color:C.muted,fontSize:12,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.note||'—'}</td>
-                      <td>
-                        <button onClick={()=>removeEntry(h.id)} style={{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:14,padding:'2px 6px'}} title="Delete">✕</button>
-                      </td>
-                    </tr>
-                  );
+                  const change=next?h.balance-next.balance:null;
+                  return html`<tr key=${h.id}>
+                    <td><span style=${{fontFamily:"'DM Mono',monospace",fontWeight:600}}>${fMo(h.month)}</span></td>
+                    <td style=${{fontFamily:"'DM Mono',monospace"}}>${fA(h.balance)}</td>
+                    <td style=${{fontFamily:"'DM Mono',monospace",color:C.green}}>${fA(h.offset)}</td>
+                    <td style=${{fontFamily:"'DM Mono',monospace",color:C.blue}}>${fA(Math.max(0,h.balance-h.offset))}</td>
+                    <td style=${{fontFamily:"'DM Mono',monospace"}}>${h.rate}%</td>
+                    <td>${change!==null?html`<span style=${{fontFamily:"'DM Mono',monospace",color:change>0?C.green:C.red,fontWeight:600}}>${change>0?'↓':change<0?'↑':'–'}${change!==0?fA(Math.abs(change)):''}</span>`:''}</td>
+                    <td style=${{color:C.muted,fontSize:12}}>${h.note||'—'}</td>
+                    <td><button onClick=${()=>del(h.id)} style=${{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:14,padding:'2px 6px'}}>✕</button></td>
+                  </tr>`;
                 })}
               </tbody>
             </table>
           </div>
-          <div style={{padding:'10px 14px',fontSize:11,color:C.muted}}>
-            {sorted.length} {sorted.length===1?'entry':'entries'} · ↓ = balance dropped (good) · Sort: newest first
-          </div>
-        </div>
-      )}
-    </div>
-  );
+          <div style=${{padding:'10px 14px',fontSize:11,color:C.muted}}>${sorted.length} entries · ↓ = balance dropped (good) · newest first</div>
+        </div>`}
+  </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// EXTRA REPAYMENTS TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-function ExtraTab({data,update}) {
-  const [date,  setDate]  = useState(new Date().toISOString().split('T')[0]);
-  const [amt,   setAmt]   = useState('');
-  const [desc,  setDesc]  = useState('');
-  const [type,  setType]  = useState('offset');
+// ── REPAYMENTS TAB ───────────────────────────────────────────────────────────
+function ExtraTab({data, update}) {
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [amt,  setAmt]  = useState('');
+  const [desc, setDesc] = useState('');
+  const [type, setType] = useState('offset');
 
-  const addRep = () => {
+  const add = () => {
     const a=parseFloat(amt.replace(/[^0-9.]/g,''));
     if(!a||a<=0) return;
     update(d=>{ d.repayments=[...d.repayments,{id:gid(),date,amount:a,description:desc.trim(),type}]; });
     setAmt(''); setDesc('');
   };
-  const removeRep = id => update(d=>{ d.repayments=d.repayments.filter(r=>r.id!==id); });
+  const del = id => update(d=>{ d.repayments=d.repayments.filter(r=>r.id!==id); });
 
   const sorted=[...data.repayments].sort((a,b)=>b.date.localeCompare(a.date));
   const total=data.repayments.reduce((s,r)=>s+r.amount,0);
-  const toOffset=data.repayments.filter(r=>r.type==='offset').reduce((s,r)=>s+r.amount,0);
-  const toPrincipal=data.repayments.filter(r=>r.type==='principal').reduce((s,r)=>s+r.amount,0);
-  const approxIntSaved=total*data.loan.rate/100; // rough annual saving if all in offset
+  const TC={offset:C.blue,principal:C.green,lump:C.amber,windfall:C.purple};
+  const TL={offset:'Offset',principal:'Repayment',lump:'Lump Sum',windfall:'Windfall'};
 
-  return (
-    <div>
-      <SH e="➕" t="Extra Repayments Tracker" sub="Log any extra payments beyond your minimum. Track what you've put in and the interest you've saved."/>
+  return html`<div>
+    <${SH} e="➕" t="Extra Repayments Tracker" sub="Log any payments beyond your minimum. See your running total and the interest you're saving."/>
 
-      {/* Summary stats */}
-      {total>0&&(
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
-          <Stat l="Total Extra Paid"     v={fmtA(total)}          accent={C.green}  sub={`${sorted.length} payments`}/>
-          <Stat l="To Offset"            v={fmtA(toOffset)}        accent={C.blue}   sub="Extra offset deposits"/>
-          <Stat l="Extra Repayments"     v={fmtA(toPrincipal)}     accent={C.purple} sub="Direct to principal"/>
-          <Stat l="Approx Annual Saving" v={`${fmtA(approxIntSaved)}/yr`} accent={C.amber} sub="If held in offset"/>
+    ${total>0 && html`<div style=${{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
+      <${Stat} l="Total Extra Paid"   v=${fA(total)}       accent=${C.green} sub=${`${sorted.length} payments`}/>
+      <${Stat} l="To Offset"          v=${fA(data.repayments.filter(r=>r.type==='offset').reduce((s,r)=>s+r.amount,0))}    accent=${C.blue}/>
+      <${Stat} l="Extra Repayments"   v=${fA(data.repayments.filter(r=>r.type==='principal').reduce((s,r)=>s+r.amount,0))} accent=${C.purple}/>
+      <${Stat} l="Approx Annual Saving" v=${`${fA(total*data.loan.rate/100)}/yr`} accent=${C.amber} sub="if held in offset"/>
+    </div>`}
+
+    <div style=${{background:'linear-gradient(135deg,rgba(0,214,143,0.07),rgba(56,189,248,0.03))',border:'1px solid rgba(0,214,143,0.2)',borderRadius:18,padding:22,marginBottom:22}}>
+      <div style=${{fontSize:13,fontWeight:700,color:C.green,marginBottom:16}}>Log a Payment</div>
+      <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))',gap:12,marginBottom:14}}>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Date</label>
+          <input type="date" value=${date} onInput=${e=>setDate(e.target.value)} style=${inp}/>
         </div>
-      )}
-
-      {/* Add form */}
-      <div style={{background:'linear-gradient(135deg,rgba(0,214,143,0.07),rgba(56,189,248,0.03))',border:'1px solid rgba(0,214,143,0.2)',borderRadius:18,padding:22,marginBottom:22}}>
-        <div style={{fontSize:13,fontWeight:700,color:C.green,marginBottom:16}}>Log a Payment</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:14}}>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Date</label>
-            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Amount</label>
-            <input placeholder="e.g. 5000" value={amt} onChange={e=>setAmt(e.target.value)} style={inp}/>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Type</label>
-            <select value={type} onChange={e=>setType(e.target.value)} style={inp}>
-              <option value="offset">Added to Offset</option>
-              <option value="principal">Extra Repayment</option>
-              <option value="lump">Lump Sum (annual)</option>
-              <option value="windfall">Windfall</option>
-            </select>
-          </div>
-          <div>
-            <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Description</label>
-            <input placeholder="e.g. Tax refund, bonus" value={desc} onChange={e=>setDesc(e.target.value)} style={inp}/>
-          </div>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Amount ($)</label>
+          <input placeholder="e.g. 5000" value=${amt} onInput=${e=>setAmt(e.target.value)} style=${inp}/>
         </div>
-        {Btn(C.green,'✓ Log Payment', addRep)}
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Type</label>
+          <select value=${type} onChange=${e=>setType(e.target.value)} style=${inp}>
+            <option value="offset">Added to Offset</option>
+            <option value="principal">Extra Repayment</option>
+            <option value="lump">Annual Lump Sum</option>
+            <option value="windfall">Windfall</option>
+          </select>
+        </div>
+        <div>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>Description</label>
+          <input placeholder="e.g. Tax refund, bonus" value=${desc} onInput=${e=>setDesc(e.target.value)} style=${inp}/>
+        </div>
       </div>
+      <button onClick=${add} style=${{padding:'9px 20px',borderRadius:8,border:'none',background:C.green,color:'#07090f',fontWeight:700,fontSize:13}}>✓ Log Payment</button>
+    </div>
 
-      {/* Payments list */}
-      {sorted.length===0 ? (
-        <div style={{textAlign:'center',padding:'40px 0',color:C.muted,fontSize:13}}>No extra payments logged yet — every dollar counts!</div>
-      ) : (
-        <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,overflow:'hidden'}}>
-          <div style={{overflowX:'auto'}}>
+    ${sorted.length===0
+      ? html`<div style=${{textAlign:'center',padding:'40px 0',color:C.muted,fontSize:13}}>No extra payments logged yet — every dollar counts!</div>`
+      : html`<div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,overflow:'hidden'}}>
+          <div style=${{overflowX:'auto'}}>
             <table>
               <thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Description</th><th></th></tr></thead>
               <tbody>
-                {sorted.map(r=>{
-                  const typeColors={offset:C.blue,principal:C.green,lump:C.amber,windfall:C.purple};
-                  const typeLabels={offset:'Offset',principal:'Repayment',lump:'Lump Sum',windfall:'Windfall'};
-                  return(
-                    <tr key={r.id}>
-                      <td style={{fontFamily:"'DM Mono',monospace"}}>{new Date(r.date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</td>
-                      <td style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.green}}>{fmtA(r.amount)}</td>
-                      <td><span style={{padding:'3px 8px',borderRadius:5,background:`${typeColors[r.type]||C.muted}20`,color:typeColors[r.type]||C.muted,fontSize:11,fontWeight:700}}>{typeLabels[r.type]||r.type}</span></td>
-                      <td style={{color:C.muted}}>{r.description||'—'}</td>
-                      <td><button onClick={()=>removeRep(r.id)} style={{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:14,padding:'2px 6px'}}>✕</button></td>
-                    </tr>
-                  );
-                })}
+                ${sorted.map(r=>html`<tr key=${r.id}>
+                  <td style=${{fontFamily:"'DM Mono',monospace"}}>${new Date(r.date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</td>
+                  <td style=${{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.green}}>${fA(r.amount)}</td>
+                  <td><span style=${{padding:'3px 8px',borderRadius:5,background:`${TC[r.type]||C.muted}20`,color:TC[r.type]||C.muted,fontSize:11,fontWeight:700}}>${TL[r.type]||r.type}</span></td>
+                  <td style=${{color:C.muted}}>${r.description||'—'}</td>
+                  <td><button onClick=${()=>del(r.id)} style=${{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:14,padding:'2px 6px'}}>✕</button></td>
+                </tr>`)}
                 <tr>
-                  <td colSpan={2} style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.green}}>{fmtA(total)}</td>
-                  <td colSpan={3} style={{color:C.muted,fontSize:12}}>Total logged</td>
+                  <td style=${{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.green}}>${fA(total)}</td>
+                  <td colspan="4" style=${{color:C.muted,fontSize:12}}>Total logged</td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>`}
+  </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CALCULATOR TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-function CalcTab({data,update}) {
-  const latest = data.history.length>0 ? data.history[data.history.length-1] : data.loan;
-  const {balance:bal, offset:off, rate} = latest;
+// ── CALCULATOR TAB ───────────────────────────────────────────────────────────
+function CalcTab({data, update}) {
+  const latest=data.history.length>0?data.history[data.history.length-1]:data.loan;
+  const {balance:bal,offset:off,rate}=latest;
+  const [extra,  setExtra]  = useState(data.strategy.extraMonthly);
+  const [lump,   setLump]   = useState(data.strategy.annualLump);
+  const [fnight, setFnight] = useState(data.strategy.fortnightly);
+  const [wf,     setWf]     = useState(0);
+  const [wfTxt,  setWfTxt]  = useState('');
 
-  const [extra,    setExtra]    = useState(data.strategy.extraMonthly);
-  const [lump,     setLump]     = useState(data.strategy.annualLump);
-  const [fnight,   setFnight]   = useState(data.strategy.fortnightly);
-  const [windfall, setWindfall] = useState(0);
-  const [wfInput,  setWfInput]  = useState('');
+  const pmt=fnight?(data.loan.payment+extra)/2:(data.loan.payment+extra);
+  const ppy=fnight?26:12;
+  const base = useMemo(()=>bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:data.loan.payment||5832,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]},[bal,off,rate,data.loan.payment]);
+  const proj = useMemo(()=>bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump}):{months:Infinity,totalInt:Infinity,pts:[]},[bal,off,rate,pmt,ppy,lump]);
+  const wfRes= useMemo(()=>wf>0&&bal>0?amort({balance:Math.max(0,bal-wf),offset:off,ratePA:rate,pmt,ppy,lump}):null,[wf,bal,off,rate,pmt,ppy,lump]);
 
-  const pmt = fnight ? (data.loan.payment+extra)/2 : (data.loan.payment+extra);
-  const ppy = fnight ? 26 : 12;
+  const moSaved=isFinite(base.months)&&isFinite(proj.months)?base.months-proj.months:0;
+  const intSaved=isFinite(base.totalInt)&&isFinite(proj.totalInt)?base.totalInt-proj.totalInt:0;
+  const wfMo=wfRes&&isFinite(base.months)&&isFinite(wfRes.months)?base.months-wfRes.months:0;
+  const wfInt=wfRes&&isFinite(base.totalInt)&&isFinite(wfRes.totalInt)?base.totalInt-wfRes.totalInt:0;
+  const per1k=wfRes&&wf>=1000&&wfInt>0?wfInt/(wf/1000):0;
+  const saveStrat=()=>update(d=>{d.strategy={extraMonthly:extra,fortnightly:fnight,annualLump:lump};});
 
-  const base  = useMemo(()=>amort({balance:bal,offset:off,ratePA:rate,pmt:data.loan.payment,ppy:12}),[bal,off,rate,data.loan.payment]);
-  const proj  = useMemo(()=>amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump}),[bal,off,rate,pmt,ppy,lump]);
-  const wfRes = useMemo(()=>windfall>0?amort({balance:Math.max(0,bal-windfall),offset:off,ratePA:rate,pmt,ppy,lump}):null,[windfall,bal,off,rate,pmt,ppy,lump]);
+  const LUMP=[1000,2000,4000,8000,10000];
+  const lumpRes=useMemo(()=>LUMP.map(ls=>({ls,...(bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:data.loan.payment||5832,ppy:12,lump:ls}):{months:Infinity,totalInt:Infinity})})),[bal,off,rate,data.loan.payment]);
 
-  const moSaved  = isFinite(base.months)&&isFinite(proj.months) ? base.months-proj.months : 0;
-  const intSaved = isFinite(base.totalInt)&&isFinite(proj.totalInt) ? base.totalInt-proj.totalInt : 0;
-  const wfMoSaved  = wfRes&&isFinite(base.months)&&isFinite(wfRes.months) ? base.months-wfRes.months : 0;
-  const wfIntSaved = wfRes&&isFinite(base.totalInt)&&isFinite(wfRes.totalInt) ? base.totalInt-wfRes.totalInt : 0;
-  const perThousand = wfRes&&windfall>=1000&&wfIntSaved>0 ? wfIntSaved/(windfall/1000) : 0;
+  const cols=['#fb923c','#fbbf24','#4ade80','#38bdf8','#c084fc'];
 
-  const saveStrategy = () => update(d=>{ d.strategy={extraMonthly:extra,fortnightly:fnight,annualLump:lump}; });
+  return html`<div>
+    <${SH} e="🧮" t="Scenario Calculator" sub="Adjust your strategy and see the impact. Save to update your dashboard projections."/>
 
-  // LUMP SUM TABLE
-  const lumpTiers=[1000,2000,4000,8000,10000];
-  const lumpResults=useMemo(()=>lumpTiers.map(ls=>({ls,...amort({balance:bal,offset:off,ratePA:rate,pmt:data.loan.payment,ppy:12,lump:ls})})),[bal,off,rate,data.loan.payment]);
-
-  return (
-    <div>
-      <SH e="🧮" t="Scenario Calculator" sub="Adjust your strategy settings and see the impact. Save to update your dashboard projections."/>
-
-      {/* Sliders */}
-      <div style={{background:`linear-gradient(135deg,rgba(56,189,248,0.07),rgba(192,132,252,0.04))`,border:`1px solid rgba(56,189,248,0.2)`,borderRadius:18,padding:22,marginBottom:20}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:20,marginBottom:18}}>
-          <div>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-              <span style={{fontSize:12,color:'#94a3b8'}}>Extra / month</span>
-              <span style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.blue,fontSize:13}}>{fmtA(extra)}</span>
-            </div>
-            <input type="range" min={0} max={2000} step={50} value={extra} onChange={e=>setExtra(+e.target.value)} style={{width:'100%',accentColor:C.blue}}/>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:C.muted,marginTop:3}}><span>$0</span><span>$1,000</span><span>$2,000</span></div>
+    <div style=${{background:'linear-gradient(135deg,rgba(56,189,248,0.07),rgba(192,132,252,0.04))',border:'1px solid rgba(56,189,248,0.2)',borderRadius:18,padding:22,marginBottom:20}}>
+      <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:20,marginBottom:18}}>
+        <div>
+          <div style=${{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+            <span style=${{fontSize:12,color:'#94a3b8'}}>Extra / month</span>
+            <span style=${{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.blue,fontSize:13}}>${fA(extra)}</span>
           </div>
-          <div>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-              <span style={{fontSize:12,color:'#94a3b8'}}>Annual lump sum</span>
-              <span style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.amber,fontSize:13}}>{fmtA(lump)}</span>
-            </div>
-            <input type="range" min={0} max={15000} step={500} value={lump} onChange={e=>setLump(+e.target.value)} style={{width:'100%',accentColor:C.amber}}/>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:C.muted,marginTop:3}}><span>$0</span><span>$7.5K</span><span>$15K</span></div>
+          <input type="range" min="0" max="2000" step="50" value=${extra} onInput=${e=>setExtra(+e.target.value)} style=${{width:'100%',accentColor:C.blue}}/>
+          <div style=${{display:'flex',justifyContent:'space-between',fontSize:10,color:C.muted,marginTop:3}}><span>$0</span><span>$1,000</span><span>$2,000</span></div>
+        </div>
+        <div>
+          <div style=${{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+            <span style=${{fontSize:12,color:'#94a3b8'}}>Annual lump sum</span>
+            <span style=${{fontFamily:"'DM Mono',monospace",fontWeight:700,color:C.amber,fontSize:13}}>${fA(lump)}</span>
           </div>
+          <input type="range" min="0" max="15000" step="500" value=${lump} onInput=${e=>setLump(+e.target.value)} style=${{width:'100%',accentColor:C.amber}}/>
+          <div style=${{display:'flex',justifyContent:'space-between',fontSize:10,color:C.muted,marginTop:3}}><span>$0</span><span>$7.5K</span><span>$15K</span></div>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18,flexWrap:'wrap'}}>
-          <button onClick={()=>setFnight(!fnight)} style={{padding:'9px 18px',borderRadius:50,border:'none',cursor:'pointer',background:fnight?C.blue:'rgba(255,255,255,0.09)',color:fnight?'#07090f':'#94a3b8',fontWeight:700,fontSize:13,fontFamily:"'Mulish',sans-serif",transition:'all 0.2s'}}>
-            {fnight?'✓ Fortnightly ON':'Switch to Fortnightly?'}
-          </button>
-          <span style={{fontSize:12,color:C.muted}}>{fmtA(fnight?pmt*26:(data.loan.payment+extra)*12)}/yr</span>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,background:'rgba(0,0,0,0.25)',borderRadius:14,padding:16,marginBottom:14}}>
-          {[['Pays off',fmtD(proj.months),C.text],['Time left',fmtY(proj.months),C.text],['Sooner',moSaved>1?fmtY(moSaved)+' sooner':'—',C.green],['Int. saved',intSaved>100?fmtA(intSaved):'—',C.green]].map(([l,v,c])=>(
-            <div key={l} style={{textAlign:'center'}}>
-              <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,marginBottom:5}}>{l}</div>
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:c}}>{v}</div>
-            </div>
-          ))}
-        </div>
-        {Btn(C.green,'💾 Save as My Strategy', saveStrategy)}
-        <span style={{fontSize:11,color:C.muted,marginLeft:12}}>Updates your dashboard projections</span>
       </div>
-
-      {/* Windfall */}
-      <div style={{background:'linear-gradient(135deg,rgba(250,204,21,0.08),rgba(251,146,60,0.04))',border:'1px solid rgba(250,204,21,0.25)',borderRadius:18,padding:22,marginBottom:20}}>
-        <div style={{fontSize:15,fontFamily:"'Syne',sans-serif",fontWeight:700,color:C.amber,marginBottom:6}}>⭐ Windfall Calculator</div>
-        <p style={{fontSize:12,color:C.muted,margin:'0 0 16px'}}>Inheritance, bonus, car sale — enter any amount and see what applying it today would do.</p>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
-          <div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(0,0,0,0.3)',border:`1px solid ${C.amber}40`,borderRadius:10,padding:'8px 14px'}}>
-            <span style={{fontFamily:"'DM Mono',monospace",color:C.muted}}>$</span>
-            <input type="text" inputMode="numeric" placeholder="e.g. 50000" value={wfInput}
-              onChange={e=>{const r=e.target.value.replace(/[^0-9]/g,'');setWfInput(r?Number(r).toLocaleString():'');setWindfall(r?Math.min(Number(r),bal):0);}}
-              style={{background:'transparent',border:'none',fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:C.amber,width:140,outline:'none'}}/>
-          </div>
-          <input type="range" min={0} max={200000} step={5000} value={Math.min(windfall,200000)}
-            onChange={e=>{const v=+e.target.value;setWindfall(v);setWfInput(v>0?v.toLocaleString():'');}}
-            style={{flex:1,minWidth:120,accentColor:C.amber}}/>
-          {windfall>0&&<button onClick={()=>{setWindfall(0);setWfInput('');}} style={{padding:'6px 12px',borderRadius:7,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,fontSize:12,cursor:'pointer'}}>✕</button>}
-        </div>
-        {windfall>0&&wfRes&&(
-          <div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,background:'rgba(0,0,0,0.25)',borderRadius:12,padding:14,marginBottom:12}}>
-              {[['New payoff',fmtD(wfRes.months)],['Time left',fmtY(wfRes.months)],['Time saved',wfMoSaved>0?fmtY(wfMoSaved):'—'],['Int. saved',wfIntSaved>0?fmtA(wfIntSaved):'—']].map(([l,v])=>(
-                <div key={l} style={{textAlign:'center'}}>
-                  <div style={{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,marginBottom:5}}>{l}</div>
-                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,color:C.green}}>{v}</div>
-                </div>
-              ))}
-            </div>
-            {perThousand>0&&<div style={{background:'rgba(250,204,21,0.07)',borderRadius:10,padding:'12px 14px',fontSize:13,color:'#fef08a'}}>
-              💡 Every <strong>$1,000</strong> applied today saves ~<strong>{fmtA(perThousand)}</strong> in total interest.
-              {wfIntSaved>windfall&&<span style={{color:C.green}}> That's a <strong>{(wfIntSaved/windfall).toFixed(1)}x</strong> return.</span>}
-            </div>}
-          </div>
-        )}
+      <div style=${{display:'flex',alignItems:'center',gap:12,marginBottom:18,flexWrap:'wrap'}}>
+        <button onClick=${()=>setFnight(!fnight)} style=${{padding:'9px 18px',borderRadius:50,border:'none',background:fnight?C.blue:'rgba(255,255,255,0.09)',color:fnight?'#07090f':'#94a3b8',fontWeight:700,fontSize:13}}>
+          ${fnight?'✓ Fortnightly ON':'Switch to Fortnightly?'}
+        </button>
+        <span style=${{fontSize:12,color:C.muted}}>${fA(fnight?pmt*26:(data.loan.payment+extra)*12)}/yr</span>
       </div>
+      <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,background:'rgba(0,0,0,0.25)',borderRadius:14,padding:16,marginBottom:14}}>
+        ${[['Pays off',fD(proj.months),C.text],['Time left',fY(proj.months),C.text],['Sooner',moSaved>1?fY(moSaved)+' sooner':'—',C.green],['Int. saved',intSaved>100?fA(intSaved):'—',C.green]].map(([l,v,c])=>html`
+          <div style=${{textAlign:'center'}}>
+            <div style=${{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,marginBottom:5}}>${l}</div>
+            <div style=${{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:c}}>${v}</div>
+          </div>`)}
+      </div>
+      <button onClick=${saveStrat} style=${{padding:'9px 18px',borderRadius:8,border:'none',background:C.green,color:'#07090f',fontWeight:700,fontSize:13}}>💾 Save as My Strategy</button>
+      <span style=${{fontSize:11,color:C.muted,marginLeft:12}}>Updates dashboard projections</span>
+    </div>
 
-      {/* Lump sum table */}
-      <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,overflow:'hidden'}}>
-        <div style={{padding:'16px 18px 8px'}}>
-          <div style={{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:700,marginBottom:3}}>🎁 Annual Lump Sum Reference</div>
-          <p style={{fontSize:12,color:C.muted,margin:0}}>Impact of throwing a set amount at the loan every year — based on current balance</p>
+    <div style=${{background:'linear-gradient(135deg,rgba(250,204,21,0.08),rgba(251,146,60,0.04))',border:'1px solid rgba(250,204,21,0.25)',borderRadius:18,padding:22,marginBottom:20}}>
+      <div style=${{fontSize:15,fontFamily:"'Syne',sans-serif",fontWeight:700,color:C.amber,marginBottom:6}}>⭐ Windfall Calculator</div>
+      <p style=${{fontSize:12,color:C.muted,margin:'0 0 16px'}}>Inheritance, bonus, car sale — enter any amount and see what applying it today would do.</p>
+      <div style=${{display:'flex',alignItems:'center',gap:12,marginBottom:14,flexWrap:'wrap'}}>
+        <div style=${{display:'flex',alignItems:'center',gap:6,background:'rgba(0,0,0,0.3)',border:`1px solid ${C.amber}40`,borderRadius:10,padding:'8px 14px'}}>
+          <span style=${{fontFamily:"'DM Mono',monospace",color:C.muted}}>$</span>
+          <input type="text" inputmode="numeric" placeholder="e.g. 50000" value=${wfTxt}
+            onInput=${e=>{const r=e.target.value.replace(/[^0-9]/g,'');setWfTxt(r?Number(r).toLocaleString():'');setWf(r?Math.min(Number(r),bal||1e9):0);}}
+            style=${{background:'transparent',border:'none',fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:C.amber,width:140,outline:'none'}}/>
         </div>
-        <div style={{overflowX:'auto'}}>
-          <table>
-            <thead><tr><th>Per Year</th><th>Pays Off</th><th>Duration</th><th>Months Saved</th><th>Int. Saved</th></tr></thead>
-            <tbody>
-              {lumpResults.map((r,i)=>{
-                const mSav=isFinite(base.months)&&isFinite(r.months)?base.months-r.months:0;
-                const iSav=isFinite(base.totalInt)&&isFinite(r.totalInt)?base.totalInt-r.totalInt:0;
-                const cols=[C.orange,C.amber,C.green,C.blue,C.purple];
-                return(
-                  <tr key={r.ls}>
-                    <td style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:cols[i]}}>{fmtA(r.ls)}</td>
-                    <td style={{fontFamily:"'DM Mono',monospace"}}>{fmtD(r.months)}</td>
-                    <td style={{fontWeight:600}}>{fmtY(r.months)}</td>
-                    <td style={{fontFamily:"'DM Mono',monospace",color:C.green,fontWeight:700}}>{fmtY(mSav)}</td>
-                    <td style={{fontFamily:"'DM Mono',monospace",color:C.green,fontWeight:700}}>{fmtA(iSav)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <input type="range" min="0" max="200000" step="5000" value=${Math.min(wf,200000)}
+          onInput=${e=>{const v=+e.target.value;setWf(v);setWfTxt(v>0?v.toLocaleString():'');}}
+          style=${{flex:1,minWidth:120,accentColor:C.amber}}/>
+        ${wf>0&&html`<button onClick=${()=>{setWf(0);setWfTxt('');}} style=${{padding:'6px 12px',borderRadius:7,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,fontSize:12}}>✕</button>`}
+      </div>
+      ${wf>0&&wfRes&&html`
+        <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,background:'rgba(0,0,0,0.25)',borderRadius:12,padding:14,marginBottom:12}}>
+          ${[['New payoff',fD(wfRes.months)],['Time left',fY(wfRes.months)],['Time saved',wfMo>0?fY(wfMo):'—'],['Int. saved',wfInt>0?fA(wfInt):'—']].map(([l,v])=>html`
+            <div style=${{textAlign:'center'}}>
+              <div style=${{fontSize:9,color:C.muted,textTransform:'uppercase',letterSpacing:1.2,marginBottom:5}}>${l}</div>
+              <div style=${{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,color:C.green}}>${v}</div>
+            </div>`)}
         </div>
+        ${per1k>0&&html`<div style=${{background:'rgba(250,204,21,0.07)',borderRadius:10,padding:'12px 14px',fontSize:13,color:'#fef08a'}}>
+          💡 Every <strong>$1,000</strong> applied today saves ~<strong>${fA(per1k)}</strong> in total interest.
+          ${wfInt>wf?html` That's a <strong style=${{color:C.green}}>${(wfInt/wf).toFixed(1)}x</strong> return.`:null}
+        </div>`}
+      `}
+    </div>
+
+    <div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,overflow:'hidden'}}>
+      <div style=${{padding:'16px 18px 8px'}}>
+        <div style=${{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:700,marginBottom:3}}>🎁 Annual Lump Sum Reference</div>
+        <p style=${{fontSize:12,color:C.muted,margin:0}}>Impact of throwing a fixed amount at the loan every year</p>
+      </div>
+      <div style=${{overflowX:'auto'}}>
+        <table>
+          <thead><tr><th>Per Year</th><th>Pays Off</th><th>Duration</th><th>Months Saved</th><th>Int. Saved</th></tr></thead>
+          <tbody>
+            ${lumpRes.map((r,i)=>html`<tr key=${r.ls}>
+              <td style=${{fontFamily:"'DM Mono',monospace",fontWeight:700,color:cols[i]}}>${fA(r.ls)}</td>
+              <td style=${{fontFamily:"'DM Mono',monospace"}}>${fD(r.months)}</td>
+              <td style=${{fontWeight:600}}>${fY(r.months)}</td>
+              <td style=${{fontFamily:"'DM Mono',monospace",color:C.green,fontWeight:700}}>${isFinite(base.months)&&isFinite(r.months)?fY(base.months-r.months):'—'}</td>
+              <td style=${{fontFamily:"'DM Mono',monospace",color:C.green,fontWeight:700}}>${isFinite(base.totalInt)&&isFinite(r.totalInt)?fA(base.totalInt-r.totalInt):'—'}</td>
+            </tr>`)}
+          </tbody>
+        </table>
       </div>
     </div>
-  );
+  </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SETTINGS TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-function SettTab({data,update,setData}) {
-  const [loan, setLoan] = useState({...data.loan});
-  const [msg,  setMsg]  = useState('');
+// ── SETTINGS TAB ─────────────────────────────────────────────────────────────
+function SettTab({data, update, setData}) {
+  const [f, setF] = useState({...data.loan});
+  const [msg, setMsg] = useState('');
 
   const saveLoan = () => {
-    update(d=>{ d.loan={...loan,balance:+loan.balance,offset:+loan.offset,rate:+loan.rate,payment:+loan.payment,origBalance:+loan.origBalance}; });
+    update(d=>{d.loan={...f,balance:+f.balance,offset:+f.offset,rate:+f.rate,payment:+f.payment,origBalance:+f.origBalance};});
     setMsg('Saved ✓'); setTimeout(()=>setMsg(''),2000);
   };
-
   const exportData = () => {
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=`mortgage-backup-${nowYM()}.json`; a.click();
     URL.revokeObjectURL(url);
   };
-
   const importData = () => {
-    const input=document.createElement('input'); input.type='file'; input.accept='.json';
-    input.onchange=e=>{
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='.json';
+    inp.onchange=e=>{
       const file=e.target.files[0]; if(!file) return;
-      const reader=new FileReader();
-      reader.onload=ev=>{ try{ setData(JSON.parse(ev.target.result)); setMsg('Imported ✓'); setTimeout(()=>setMsg(''),2000); }catch{ setMsg('Invalid file'); } };
-      reader.readAsText(file);
+      const r=new FileReader();
+      r.onload=ev=>{try{setData(JSON.parse(ev.target.result));setMsg('Imported ✓');setTimeout(()=>setMsg(''),2000);}catch{setMsg('Invalid file');}};
+      r.readAsText(file);
     };
-    input.click();
+    inp.click();
   };
-
-  const resetData = () => {
+  const reset = () => {
     if(window.confirm('Reset ALL data? This cannot be undone.')) {
-      setData({...INIT,history:[{id:gid(),month:nowYM(),balance:INIT.loan.balance,offset:INIT.loan.offset,rate:INIT.loan.rate,note:'Reset'}]});
-      setMsg('Reset ✓'); setTimeout(()=>setMsg(''),2000);
+      setData({...INIT}); setMsg('Reset ✓'); setTimeout(()=>setMsg(''),2000);
     }
   };
 
   const fields=[
-    {k:'balance',l:'Current Loan Balance',t:'number',step:'0.01'},
-    {k:'offset',l:'Current Offset Balance',t:'number',step:'0.01'},
-    {k:'rate',l:'Interest Rate (% p.a.)',t:'number',step:'0.01'},
-    {k:'payment',l:'Monthly Repayment',t:'number',step:'1'},
-    {k:'origBalance',l:'Original Loan Amount',t:'number',step:'1'},
-    {k:'origEnd',l:'Original End Date (YYYY-MM)',t:'text',placeholder:'2051-09'},
+    {k:'balance',l:'Current Loan Balance ($)'},
+    {k:'offset',l:'Current Offset Balance ($)'},
+    {k:'rate',l:'Interest Rate (% p.a.)'},
+    {k:'payment',l:'Monthly Repayment ($)'},
+    {k:'origBalance',l:'Original Loan Amount ($)'},
+    {k:'origEnd',l:'Original End Date (YYYY-MM)'},
   ];
 
-  return (
-    <div>
-      <SH e="⚙️" t="Settings" sub="Update your loan details, manage your data, and export backups."/>
+  return html`<div>
+    <${SH} e="⚙️" t="Settings" sub="Update your loan details here. These feed into all projections and the dashboard."/>
 
-      {/* Loan details */}
-      <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:22,marginBottom:20}}>
-        <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Loan Details</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14,marginBottom:16}}>
-          {fields.map(f=>(
-            <div key={f.k}>
-              <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>{f.l}</label>
-              <input type={f.t||'text'} step={f.step} placeholder={f.placeholder||''} value={loan[f.k]||''}
-                onChange={e=>setLoan(p=>({...p,[f.k]:f.t==='number'?e.target.value:e.target.value}))} style={inp}/>
-            </div>
-          ))}
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-          {Btn(C.blue,'💾 Save Loan Details',saveLoan)}
-          {msg&&<span style={{fontSize:12,color:C.green,fontFamily:"'DM Mono',monospace"}}>{msg}</span>}
-        </div>
+    <div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:22,marginBottom:20}}>
+      <div style=${{fontSize:13,fontWeight:700,marginBottom:16}}>Loan Details</div>
+      <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14,marginBottom:16}}>
+        ${fields.map(({k,l})=>html`<div key=${k}>
+          <label style=${{fontSize:11,color:C.muted,display:'block',marginBottom:5}}>${l}</label>
+          <input value=${f[k]||''} onInput=${e=>setF(p=>({...p,[k]:e.target.value}))} style=${inp}/>
+        </div>`)}
       </div>
-
-      {/* Data management */}
-      <div style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:22}}>
-        <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:6}}>Data Management</div>
-        <p style={{fontSize:12,color:C.muted,margin:'0 0 18px',lineHeight:1.6}}>
-          Your data is stored in your browser's localStorage. Export regularly to keep a backup.
-          To use on a new device or browser, export then import.
-        </p>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-          {Btn(C.green,'⬇ Export Backup (JSON)',exportData)}
-          {Btn(C.blue,'⬆ Import Backup',importData)}
-          {Btn('rgba(248,113,113,0.2)','🗑 Reset All Data',resetData,{color:C.red,border:`1px solid ${C.red}40`})}
-        </div>
-        <div style={{marginTop:20,padding:'14px 16px',background:'rgba(56,189,248,0.05)',border:'1px solid rgba(56,189,248,0.15)',borderRadius:12,fontSize:12,color:'#bae6fd',lineHeight:1.7}}>
-          <strong>GitHub Pages setup:</strong> Save this HTML file as <code>index.html</code> in your repo root, commit it, and enable GitHub Pages in repo Settings → Pages. Your dashboard will be live at <code>username.github.io/repo-name</code>. Data stays in that browser's localStorage — perfect for a dedicated device or a bookmarked tab.
-        </div>
+      <div style=${{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+        <button onClick=${saveLoan} style=${{padding:'9px 18px',borderRadius:8,border:'none',background:C.blue,color:'#07090f',fontWeight:700,fontSize:13}}>💾 Save Loan Details</button>
+        ${msg&&html`<span style=${{fontSize:12,color:C.green,fontFamily:"'DM Mono',monospace"}}>${msg}</span>`}
       </div>
     </div>
-  );
+
+    <div style=${{background:C.surf,border:`1px solid ${C.border}`,borderRadius:18,padding:22}}>
+      <div style=${{fontSize:13,fontWeight:700,marginBottom:6}}>Data Management</div>
+      <p style=${{fontSize:12,color:C.muted,margin:'0 0 18px',lineHeight:1.6}}>
+        Your data lives in this browser's localStorage — private, no accounts needed. Export regularly as a backup, and use Import to restore or move to a new device.
+      </p>
+      <div style=${{display:'flex',gap:10,flexWrap:'wrap',marginBottom:20}}>
+        <button onClick=${exportData} style=${{padding:'9px 18px',borderRadius:8,border:'none',background:C.green,color:'#07090f',fontWeight:700,fontSize:13}}>⬇ Export Backup (JSON)</button>
+        <button onClick=${importData} style=${{padding:'9px 18px',borderRadius:8,border:'none',background:C.blue,color:'#07090f',fontWeight:700,fontSize:13}}>⬆ Import Backup</button>
+        <button onClick=${reset} style=${{padding:'9px 18px',borderRadius:8,border:`1px solid ${C.red}40`,background:'rgba(248,113,113,0.1)',color:C.red,fontWeight:700,fontSize:13}}>🗑 Reset All Data</button>
+      </div>
+      <div style=${{padding:'14px 16px',background:'rgba(56,189,248,0.05)',border:'1px solid rgba(56,189,248,0.15)',borderRadius:12,fontSize:12,color:'#bae6fd',lineHeight:1.7}}>
+        <strong>GitHub Pages:</strong> This file is live at 
+        <a href="https://litestep23.github.io/mortgage-dashboard/" target="_blank" style=${{color:C.blue}}>litestep23.github.io/mortgage-dashboard</a>. 
+        Bookmark it on your main device for monthly reviews. To update the app, replace <code>index.html</code> in the repo.
+      </div>
+    </div>
+  </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN APP
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [data,  setData]  = useState(null);
   const [tab,   setTab]   = useState('dash');
   const [saved, setSaved] = useState(false);
 
-  // Load from localStorage
   useEffect(()=>{
-    try {
-      const raw=localStorage.getItem(SK);
-      if(raw) { setData(JSON.parse(raw)); }
-      else {
-        const init={...INIT,history:[]};
-        setData(init);
-      }
-    } catch { setData(INIT); }
+    const d=load();
+    setData(d||{...INIT});
   },[]);
 
-  // Auto-save with debounce
   useEffect(()=>{
-    if(!data) return;
-    const t=setTimeout(()=>{
-      try{ localStorage.setItem(SK,JSON.stringify(data)); setSaved(true); setTimeout(()=>setSaved(false),2000); }catch(e){console.error(e);}
-    },600);
+    if(!data)return;
+    const t=setTimeout(()=>{ save(data); setSaved(true); setTimeout(()=>setSaved(false),2000); },600);
     return()=>clearTimeout(t);
   },[data]);
 
-  const update=fn=>setData(d=>{const n=JSON.parse(JSON.stringify(d));fn(n);return n;});
+  const update = fn => setData(d=>{ const n=JSON.parse(JSON.stringify(d)); fn(n); return n; });
 
-  if(!data) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:C.bg,color:C.muted,fontFamily:"'Mulish',sans-serif",fontSize:14}}>Loading…</div>;
+  if(!data) return html`<div style=${{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:C.bg,color:C.muted,fontFamily:'sans-serif',fontSize:14}}>Loading…</div>`;
 
-  const TABS=[{id:'dash',icon:'📊',l:'Overview'},{id:'track',icon:'📅',l:'History'},{id:'extra',icon:'➕',l:'Repayments'},{id:'calc',icon:'🧮',l:'Calculator'},{id:'sett',icon:'⚙️',l:'Settings'}];
+  const TABS=[{id:'dash',i:'📊',l:'Overview'},{id:'track',i:'📅',l:'History'},{id:'extra',i:'➕',l:'Repayments'},{id:'calc',i:'🧮',l:'Calculator'},{id:'sett',i:'⚙️',l:'Settings'}];
 
-  return (
-    <div style={{fontFamily:"'Mulish',sans-serif",background:C.bg,minHeight:'100vh',color:C.text}}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Mulish:wght@300;400;500;600;700&display=swap');
-        input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;cursor:pointer;}
-        input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;border:2px solid #07090f;cursor:pointer;}
-      `}</style>
-
-      {/* NAV */}
-      <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:20}}>
-        <div style={{maxWidth:940,margin:'0 auto',padding:'0 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:4}}>
-          <div style={{display:'flex',gap:0}}>
-            {TABS.map(t=>(
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'13px 12px',border:'none',background:'transparent',color:tab===t.id?C.blue:C.muted,fontWeight:tab===t.id?700:500,fontSize:12,cursor:'pointer',fontFamily:"'Mulish',sans-serif",borderBottom:`2px solid ${tab===t.id?C.blue:'transparent'}`,display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap',transition:'color 0.15s'}}>
-                <span>{t.icon}</span><span>{t.l}</span>
-              </button>
-            ))}
-          </div>
-          <div style={{fontSize:10,color:saved?C.green:C.muted,fontFamily:"'DM Mono',monospace",flexShrink:0}}>{saved?'✓ Saved':'Mortgage Dashboard'}</div>
+  return html`<div style=${{fontFamily:"'Mulish',sans-serif",background:C.bg,minHeight:'100vh',color:C.text}}>
+    <div style=${{background:C.surf,borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:20}}>
+      <div style=${{maxWidth:940,margin:'0 auto',padding:'0 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:4}}>
+        <div style=${{display:'flex',gap:0,overflowX:'auto'}}>
+          ${TABS.map(t=>html`<button key=${t.id} onClick=${()=>setTab(t.id)} style=${{padding:'13px 12px',border:'none',background:'transparent',color:tab===t.id?C.blue:C.muted,fontWeight:tab===t.id?700:500,fontSize:12,cursor:'pointer',borderBottom:`2px solid ${tab===t.id?C.blue:'transparent'}`,display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap',transition:'color 0.15s'}}>
+            <span>${t.i}</span><span>${t.l}</span>
+          </button>`)}
         </div>
-      </div>
-
-      {/* PAGE HEADER */}
-      <div style={{background:'radial-gradient(ellipse 80% 40% at 50% 0%,rgba(56,189,248,0.1),transparent)',borderBottom:`1px solid ${C.border}`,padding:'24px 14px 20px'}}>
-        <div style={{maxWidth:940,margin:'0 auto'}}>
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,letterSpacing:3,color:C.blue,textTransform:'uppercase',marginBottom:6}}>Home Loan Dashboard · Melbourne</div>
-          <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:'clamp(22px,5vw,36px)',fontWeight:800,letterSpacing:'-1px',margin:0,lineHeight:1.1}}>
-            {TABS.find(t=>t.id===tab)?.icon} {TABS.find(t=>t.id===tab)?.l}
-          </h1>
-        </div>
-      </div>
-
-      {/* CONTENT */}
-      <div style={{maxWidth:940,margin:'0 auto',padding:'24px 14px 60px'}}>
-        {tab==='dash'  && <DashTab  data={data} update={update} setTab={setTab}/>}
-        {tab==='track' && <TrackTab data={data} update={update}/>}
-        {tab==='extra' && <ExtraTab data={data} update={update}/>}
-        {tab==='calc'  && <CalcTab  data={data} update={update}/>}
-        {tab==='sett'  && <SettTab  data={data} update={update} setData={setData}/>}
+        <div style=${{fontSize:10,color:saved?C.green:C.muted,fontFamily:"'DM Mono',monospace",flexShrink:0}}>${saved?'✓ Saved':'Mortgage Dashboard'}</div>
       </div>
     </div>
-  );
+
+    <div style=${{background:'radial-gradient(ellipse 80% 40% at 50% 0%,rgba(56,189,248,0.1),transparent)',borderBottom:`1px solid ${C.border}`,padding:'20px 14px 16px'}}>
+      <div style=${{maxWidth:940,margin:'0 auto'}}>
+        <div style=${{fontFamily:"'DM Mono',monospace",fontSize:9,letterSpacing:3,color:C.blue,textTransform:'uppercase',marginBottom:4}}>Home Loan Dashboard · Melbourne</div>
+        <h1 style=${{fontFamily:"'Syne',sans-serif",fontSize:'clamp(20px,5vw,32px)',fontWeight:800,letterSpacing:'-1px',margin:0,lineHeight:1.1}}>${TABS.find(t=>t.id===tab)?.i} ${TABS.find(t=>t.id===tab)?.l}</h1>
+      </div>
+    </div>
+
+    <div style=${{maxWidth:940,margin:'0 auto',padding:'24px 14px 60px'}}>
+      ${tab==='dash'  && html`<${DashTab}  data=${data} update=${update} setTab=${setTab}/>`}
+      ${tab==='track' && html`<${TrackTab} data=${data} update=${update}/>`}
+      ${tab==='extra' && html`<${ExtraTab} data=${data} update=${update}/>`}
+      ${tab==='calc'  && html`<${CalcTab}  data=${data} update=${update}/>`}
+      ${tab==='sett'  && html`<${SettTab}  data=${data} update=${update} setData=${setData}/>`}
+    </div>
+  </div>`;
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+createRoot(document.getElementById('root')).render(html`<${App}/>`);
 </script>
 </body>
 </html>
