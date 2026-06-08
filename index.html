@@ -522,14 +522,15 @@ function attachEvents(){
 
   // Settings save
   document.getElementById('s-save')?.addEventListener('click',()=>{
-    D.loan.balance=+document.getElementById('s-bal').value||0;
-    D.loan.offset=+document.getElementById('s-off').value||0;
-    D.loan.rate=+document.getElementById('s-rate').value||6.04;
-    D.loan.payment=+document.getElementById('s-pmt').value||0;
-    D.loan.origBalance=+document.getElementById('s-orig').value||0;
-    D.loan.origEnd=document.getElementById('s-end').value||'2051-09';
+    const pn=id=>parseFloat((document.getElementById(id)?.value||'').replace(/[^0-9.]/g,''))||0;
+    D.loan.balance    = pn('s-bal');
+    D.loan.offset     = pn('s-off');
+    D.loan.rate       = parseFloat(document.getElementById('s-rate')?.value)||6.04;
+    D.loan.payment    = pn('s-pmt');
+    D.loan.origBalance= pn('s-orig');
+    D.loan.origEnd    = document.getElementById('s-end')?.value||'2051-09';
     saveData();
-    const m=document.getElementById('s-msg');if(m){m.textContent='Saved ✓';setTimeout(()=>m.textContent='',2500);}
+    renderApp(); // re-renders form from saved D.loan so user can see it stuck
   });
   document.getElementById('s-export')?.addEventListener('click',()=>{
     const blob=new Blob([JSON.stringify(D,null,2)],{type:'application/json'});
