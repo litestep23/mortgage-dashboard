@@ -36,8 +36,8 @@ const SK = "mortgageDashV1";
 
 // ─── DEFAULT DATA (pre-filled with Ryan's details) ───────────────────────────
 const INIT = {
-  loan: { balance:928418.30, offset:78642.01, rate:6.04, payment:5832, origBalance:1025257, origEnd:"2051-09" },
-  strategy: { extraMonthly:250, fortnightly:false, annualLump:4000 },
+  loan: { balance:0, offset:0, rate:6.04, payment:0, origBalance:0, origEnd:"2051-09" },
+  strategy: { extraMonthly:0, fortnightly:false, annualLump:0 },
   history: [],
   repayments: [],
 };
@@ -99,7 +99,7 @@ function DashTab({data,setTab}) {
   const ppy = strat.fortnightly ? 26 : 12;
   const proj = useMemo(()=>amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump:strat.annualLump}),[bal,off,rate,pmt,ppy,strat.annualLump]);
   const base = useMemo(()=>amort({balance:bal,offset:off,ratePA:rate,pmt:data.loan.payment,ppy:12}),[bal,off,rate,data.loan.payment]);
-  const origBal = data.loan.origBalance||1025257;
+  const origBal = data.loan.origBalance||0;
   const paidPct = ((origBal-bal)/origBal*100).toFixed(1);
   const startBal = hist.length>0 ? hist[0].balance : bal;
   const dropped = startBal-bal;
@@ -284,7 +284,7 @@ function TrackTab({data,update}) {
           </div>
         </div>
         {Btn(C.green,'✓ Save Entry', addEntry)}
-        <p style={{fontSize:11,color:C.muted,marginTop:10,marginBottom:0}}>If the month already exists it will be updated. Balance and offset fields accept any number format (e.g. 928418 or 928,418).</p>
+        <p style={{fontSize:11,color:C.muted,marginTop:10,marginBottom:0}}>If the month already exists it will be updated. Balance and offset fields accept any number format (e.g. 750000 or 750,000).</p>
       </div>
 
       {/* History table */}
@@ -676,7 +676,7 @@ function App() {
       const raw=localStorage.getItem(SK);
       if(raw) { setData(JSON.parse(raw)); }
       else {
-        const init={...INIT,history:[{id:gid(),month:nowYM(),balance:INIT.loan.balance,offset:INIT.loan.offset,rate:INIT.loan.rate,note:'Opening balance'}]};
+        const init={...INIT,history:[]};
         setData(init);
       }
     } catch { setData(INIT); }
