@@ -60,7 +60,7 @@ function loadData(){try{const r=localStorage.getItem(SK);return r?JSON.parse(r):
 function saveData(){try{localStorage.setItem(SK,JSON.stringify(D));flashSaved()}catch(e){}}
 function flashSaved(){const el=document.getElementById('si');if(el){el.textContent='✓ Saved';el.style.color=C.green;setTimeout(()=>{el.textContent='Mortgage Dashboard';el.style.color=C.muted},2500)}}
 
-const INIT={loan:{balance:0,offset:0,rate:6.04,payment:0,origBalance:0,origEnd:'2051-09'},strategy:{extraMonthly:0,fortnightly:false,annualLump:0},history:[],repayments:[]};
+const INIT={loan:{balance:928418.3,offset:78642.01,rate:6.04,payment:5832,origBalance:1025257,origEnd:'2051-09'},strategy:{extraMonthly:250,fortnightly:false,annualLump:4000},history:[],repayments:[]};
 let D=loadData()||JSON.parse(JSON.stringify(INIT));
 let TAB='dash';
 
