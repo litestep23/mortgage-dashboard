@@ -123,28 +123,54 @@ const gbtn=(l,id,col)=>`<button id="${id}" style="padding:9px 18px;border-radius
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function renderDash(){
-  const hist=D.history,latest=hist.length>0?hist[hist.length-1]:D.loan;
-  const{balance:bal,offset:off,rate}=latest;
-  if(!bal)return`<div style="text-align:center;padding:60px 20px;color:${C.muted}">
-    <div style="font-size:40px;margin-bottom:16px">🏠</div>
-    <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:${C.text};margin-bottom:8px">Welcome to your Mortgage Dashboard</div>
-    <p style="font-size:14px;line-height:1.7;margin-bottom:24px">Start by entering your loan details in Settings,<br>then record your first month in History.</p>
-    ${pbtn('⚙️ Go to Settings','go-sett',C.blue)}
-  </div>`;
-
-  const st=D.strategy,pmt=st.fortnightly?(D.loan.payment+st.extraMonthly)/2:(D.loan.payment+st.extraMonthly),ppy=st.fortnightly?26:12;
+  const l=D.loan,hist=D.history;
+  const{balance:bal,offset:off,rate}=l;
+  const eff=Math.max(0,bal-off);
+  const st=D.strategy,pmt=st.fortnightly?(l.payment+st.extraMonthly)/2:(l.payment+st.extraMonthly),ppy=st.fortnightly?26:12;
   const proj=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump:st.annualLump}):{months:Infinity,totalInt:Infinity,pts:[]};
-  const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:D.loan.payment||5832,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]};
-  const origBal=D.loan.origBalance||bal||1,eff=Math.max(0,bal-off);
+  const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:l.payment||5832,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]};
+  const origBal=l.origBalance||bal||1;
   const paidPct=origBal>0?((origBal-bal)/origBal*100).toFixed(1):'0.0';
   const dropped=hist.length>0?hist[0].balance-bal:0;
   const moSaved=isFinite(base.months)&&isFinite(proj.months)?base.months-proj.months:0;
   const totalExtra=D.repayments.reduce((s,r)=>s+r.amount,0);
   const chartData=buildChart(hist,proj,base);
 
+  const loanForm=`<div style="background:linear-gradient(135deg,rgba(56,189,248,.06),rgba(192,132,252,.03));border:1px solid rgba(56,189,248,.18);border-radius:18px;padding:22px;margin-bottom:22px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <span style="font-size:13px;font-weight:700">📋 Loan Details</span>
+    <span style="font-size:11px;color:${C.muted}">— update these each month, everything below recalculates instantly</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:16px">
+    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Loan Balance ($)</label>
+      <input id="d-bal" value="${l.balance||''}" placeholder="e.g. 928418" style="${INP}"></div>
+    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Offset Balance ($)</label>
+      <input id="d-off" value="${l.offset||''}" placeholder="e.g. 78642" style="${INP}"></div>
+    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Interest Rate (% p.a.)</label>
+      <input id="d-rate" value="${l.rate||''}" placeholder="6.04" style="${INP}"></div>
+    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Monthly Repayment ($)</label>
+      <input id="d-pmt" value="${l.payment||''}" placeholder="e.g. 5832" style="${INP}"></div>
+    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original Loan Amount ($)</label>
+      <input id="d-orig" value="${l.origBalance||''}" placeholder="e.g. 1025257" style="${INP}"></div>
+    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label>
+      <input id="d-end" value="${l.origEnd||''}" placeholder="2051-09" style="${INP}"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    ${pbtn('💾 Save & Update','d-save',C.blue)}
+    <span id="d-msg" style="font-size:11px;color:${C.green};font-family:'DM Mono',monospace"></span>
+  </div>
+</div>`;
+
+  if(!bal)return`<div>${loanForm}
+    <div style="text-align:center;padding:30px 20px;color:${C.muted};font-size:13px">
+      Fill in your loan details above and hit Save — your dashboard will appear here.
+    </div>
+  </div>`;
+
   return`<div>
+${loanForm}
 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
-  ${stat('Current Balance',fA(bal),`as of ${hist.length>0?fMo(latest.month):'now'}`,C.red)}
+  ${stat('Current Balance',fA(bal),`as of ${fMo(nowYM())}`,C.red)}
   ${stat('Effective Balance',fA(eff),`Offset: ${fA(off)}`,C.blue)}
   ${stat('Interest Rate',`${rate}% p.a.`,'',C.amber)}
   ${stat('Offset Saves / Year',fA(off*rate/100),`${fA(off*rate/100/365)}/day`,C.green)}
@@ -166,7 +192,7 @@ function renderDash(){
     <div style="background:linear-gradient(135deg,rgba(0,214,143,.08),rgba(56,189,248,.04));border:1px solid rgba(0,214,143,.2);border-radius:18px;padding:18px">
       <div style="font-size:11px;color:${C.green};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">This Month</div>
       ${kv('Interest charge',fA(eff*rate/100/12),C.red)}
-      ${kv('Principal reduction',fA((D.loan.payment||0)-eff*rate/100/12),C.green)}
+      ${kv('Principal reduction',fA((l.payment||0)-eff*rate/100/12),C.green)}
       ${kv('Daily offset saving',`${fA(off*rate/100/365)}/day`,C.blue)}
     </div>
     <div class="surf" style="flex:1">
@@ -184,9 +210,8 @@ function renderDash(){
   ${svgChart(chartData)}
 </div>
 <div style="display:flex;gap:12px;flex-wrap:wrap">
-  ${pbtn('📅 Record This Month','go-track',C.green)}
   ${pbtn('➕ Log Extra Payment','go-extra',C.blue)}
-  <button id="go-sett2" style="padding:9px 18px;border-radius:8px;border:1px solid ${C.border};background:transparent;color:${C.muted};font-weight:600;font-size:13px">⚙️ Settings</button>
+  ${pbtn('📅 View History','go-track',C.green)}
 </div></div>`;
 }
 
@@ -458,9 +483,21 @@ function renderSett(){
 
 // ── EVENT ATTACHMENT ──────────────────────────────────────────────────────────
 function attachEvents(){
-  // Dashboard
-  document.getElementById('go-sett')?.addEventListener('click',()=>setTab('sett'));
-  document.getElementById('go-sett2')?.addEventListener('click',()=>setTab('sett'));
+  // Dashboard loan details save
+  document.getElementById('d-save')?.addEventListener('click',()=>{
+    const pn=id=>parseFloat((document.getElementById(id)?.value||'').replace(/[^0-9.]/g,''))||0;
+    const b=pn('d-bal'),o=pn('d-off'),r=parseFloat(document.getElementById('d-rate')?.value)||6.04;
+    D.loan.balance=b; D.loan.offset=o; D.loan.rate=r;
+    D.loan.payment=pn('d-pmt'); D.loan.origBalance=pn('d-orig');
+    D.loan.origEnd=document.getElementById('d-end')?.value||'2051-09';
+    // Auto-add/update this month's history entry
+    const m=nowYM(),entry={id:gid(),month:m,balance:b,offset:o,rate:r,note:''};
+    const idx=D.history.findIndex(h=>h.month===m);
+    if(idx>=0){D.history[idx].balance=b;D.history[idx].offset=o;D.history[idx].rate=r;}
+    else D.history=[...D.history,entry].sort((a,b_)=>a.month.localeCompare(b_.month));
+    saveData(); renderApp();
+  });
+  // Dashboard nav buttons
   document.getElementById('go-track')?.addEventListener('click',()=>setTab('track'));
   document.getElementById('go-extra')?.addEventListener('click',()=>setTab('extra'));
 
