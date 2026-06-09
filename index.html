@@ -202,7 +202,10 @@ ${loanForm}
           <span style="font-size:12px;color:${C.muted}">Monthly repayment</span>
           <div style="display:flex;align-items:center;gap:8px">
             <button id="d-pmt-reset" style="padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:${C.muted};font-size:11px;cursor:pointer">↺ Reset</button>
-            <span id="d-pmt-lbl" style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:${C.blue}">${fA(l.payment||5832)}</span>
+            <div style="display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.3);border:1px solid rgba(56,189,248,.35);border-radius:8px;padding:3px 10px">
+              <span style="font-family:'DM Mono',monospace;font-size:13px;color:${C.muted}">$</span>
+              <input id="d-pmt-input" type="text" inputmode="numeric" value="${(l.payment||5832).toLocaleString('en-AU')}" style="background:transparent;border:none;font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${C.blue};width:72px;outline:none;text-align:right;padding:0">
+            </div>
             <span id="d-pmt-diff" style="font-size:11px;color:${C.muted}">base</span>
           </div>
         </div>
@@ -641,8 +644,12 @@ function attachEvents(){
 
   // Slider reset buttons — snap back to baseline and fire the input handler
   document.getElementById('d-pmt-reset')?.addEventListener('click',()=>{
+    const v=D.loan.payment||5832;
     const s=document.getElementById('d-pmt-slider');
-    if(s){s.value=D.loan.payment||5832;s.dispatchEvent(new Event('input'));}
+    const inp=document.getElementById('d-pmt-input');
+    if(s) s.value=v;
+    if(inp) inp.value=v.toLocaleString('en-AU');
+    applyPmtValue(v);
   });
   document.getElementById('d-off-reset')?.addEventListener('click',()=>{
     const s=document.getElementById('d-off-slider');
@@ -673,18 +680,16 @@ function attachEvents(){
   });
 
   // Repayment explorer slider — live projection updates without re-render
-  document.getElementById('d-pmt-slider')?.addEventListener('input',function(){
-    const pmt=+this.value, basePmt=D.loan.payment||5832;
-    const diff=pmt-basePmt;
-    const lbl=document.getElementById('d-pmt-lbl');
-    const dlbl=document.getElementById('d-pmt-diff');
-    if(lbl){lbl.textContent=fA(pmt);lbl.style.color=diff>0?C.green:diff<0?C.red:C.blue;}
-    if(dlbl){
-      dlbl.textContent=diff===0?'base':diff>0?`+${fA(diff)}/mo`:`${fA(diff)}/mo`;
-      dlbl.style.color=diff>0?C.green:diff<0?C.red:C.muted;
-    }
-    const l=D.loan;
-    if(!l.balance)return;
+  // Shared repayment projection updater
+  function applyPmtValue(pmt, fromInput=false) {
+    const basePmt=D.loan.payment||5832, diff=pmt-basePmt;
+    const inp=document.getElementById('d-pmt-input'), dlbl=document.getElementById('d-pmt-diff');
+    const slider=document.getElementById('d-pmt-slider');
+    if(inp && !fromInput){ inp.value=pmt.toLocaleString('en-AU'); inp.style.color=diff>0?C.green:diff<0?C.red:C.blue; }
+    if(inp && fromInput)  { inp.style.color=diff>0?C.green:diff<0?C.red:C.blue; }
+    if(slider && !fromInput) slider.value=Math.min(Math.max(pmt,3000),12000);
+    if(dlbl){ dlbl.textContent=diff===0?'base':diff>0?`+${fA(diff)}/mo`:`${fA(diff)}/mo`; dlbl.style.color=diff>0?C.green:diff<0?C.red:C.muted; }
+    const l=D.loan; if(!l.balance)return;
     const baseP=amort({balance:l.balance,offset:l.offset,ratePA:l.rate,pmt:basePmt,ppy:12});
     const newP =amort({balance:l.balance,offset:l.offset,ratePA:l.rate,pmt,ppy:12});
     const mSav=isFinite(baseP.months)&&isFinite(newP.months)?baseP.months-newP.months:0;
@@ -696,6 +701,19 @@ function attachEvents(){
       ${kv(diff===0?'At base repayment':diff>0?'Sooner than base':'Later than base', mSav===0?'Baseline':mSav>0?fY(mSav)+' sooner':fY(Math.abs(mSav))+' longer', mSav>0?C.green:mSav<0?C.red:C.muted)}
       ${kv('Total interest',fA(newP.totalInt)+(iSav>0?` <span style="color:${C.green};font-size:11px">(save ${fA(iSav)})</span>`:''))}
     `;
+  }
+  document.getElementById('d-pmt-slider')?.addEventListener('input',function(){ applyPmtValue(+this.value); });
+  // Manual text input — parse, clamp, sync slider
+  document.getElementById('d-pmt-input')?.addEventListener('input',function(){
+    const raw=this.value.replace(/[^0-9]/g,'');
+    if(!raw)return;
+    applyPmtValue(+raw, true);
+  });
+  document.getElementById('d-pmt-input')?.addEventListener('blur',function(){
+    const raw=this.value.replace(/[^0-9]/g,'');
+    const v=Math.min(Math.max(+(raw||D.loan.payment||5832),3000),12000);
+    this.value=v.toLocaleString('en-AU');
+    applyPmtValue(v, true);
   });
 
   // History save
