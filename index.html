@@ -198,11 +198,12 @@ ${loanForm}
     <div class="surf" style="flex:1">
       <div style="font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">Repayment Explorer</div>
       <div style="margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:12px;color:${C.muted}">Monthly repayment</span>
-          <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button id="d-pmt-reset" style="padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:${C.muted};font-size:11px;cursor:pointer">↺ Reset</button>
             <span id="d-pmt-lbl" style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:${C.blue}">${fA(l.payment||5832)}</span>
-            <span id="d-pmt-diff" style="font-size:11px;margin-left:8px;color:${C.muted}">base</span>
+            <span id="d-pmt-diff" style="font-size:11px;color:${C.muted}">base</span>
           </div>
         </div>
         <input id="d-pmt-slider" type="range" min="3000" max="12000" step="100" value="${l.payment||5832}" style="width:100%;accent-color:${C.blue}">
@@ -225,11 +226,12 @@ ${loanForm}
   <div style="font-size:11px;color:${C.green};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">⚡ Offset Explorer</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
     <div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:12px;color:${C.muted}">Offset balance</span>
-        <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="d-off-reset" style="padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:${C.muted};font-size:11px;cursor:pointer">↺ Reset</button>
           <span id="d-off-lbl" style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:${C.green}">${fA(off)}</span>
-          <span id="d-off-diff" style="font-size:11px;margin-left:8px;color:${C.muted}">current</span>
+          <span id="d-off-diff" style="font-size:11px;color:${C.muted}">current</span>
         </div>
       </div>
       <input id="d-off-slider" type="range" min="0" max="300000" step="5000" value="${Math.round(off/5000)*5000}" style="width:100%;accent-color:${C.green}">
@@ -542,6 +544,16 @@ function attachEvents(){
   // Dashboard nav buttons
   document.getElementById('go-track')?.addEventListener('click',()=>setTab('track'));
   document.getElementById('go-extra')?.addEventListener('click',()=>setTab('extra'));
+
+  // Slider reset buttons — snap back to baseline and fire the input handler
+  document.getElementById('d-pmt-reset')?.addEventListener('click',()=>{
+    const s=document.getElementById('d-pmt-slider');
+    if(s){s.value=D.loan.payment||5832;s.dispatchEvent(new Event('input'));}
+  });
+  document.getElementById('d-off-reset')?.addEventListener('click',()=>{
+    const s=document.getElementById('d-off-slider');
+    if(s){s.value=Math.round((D.loan.offset||0)/5000)*5000;s.dispatchEvent(new Event('input'));}
+  });
 
   // Offset explorer slider
   document.getElementById('d-off-slider')?.addEventListener('input',function(){
