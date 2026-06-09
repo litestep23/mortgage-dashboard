@@ -20,6 +20,16 @@ td{padding:10px;font-size:13px;color:#e2e8f5;border-bottom:1px solid rgba(255,25
 tr:hover td{background:rgba(255,255,255,.02)}
 .surf{background:#0c1018;border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:22px}
 .tag{display:inline-block;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700}
+@media(max-width:640px){
+  .g2{grid-template-columns:1fr!important}
+  .nav-lbl{display:none}
+  .surf{padding:16px!important}
+  th{padding:6px 8px}
+  td{padding:8px;font-size:12px}
+  .stat-row>div{flex:1 1 calc(50% - 5px)!important;padding:12px 14px!important}
+  .dash-btns{flex-direction:column}
+  .dash-btns button{width:100%;text-align:center}
+}
 </style>
 </head>
 <body>
@@ -141,7 +151,7 @@ function renderDash(){
     <span style="font-size:13px;font-weight:700">📋 Loan Details</span>
     <span style="font-size:11px;color:${C.muted}">— update these each month, everything below recalculates instantly</span>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
     <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Loan Balance ($)</label>
       <input id="d-bal" value="${l.balance||''}" placeholder="e.g. 928418" style="${INP}"></div>
     <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Offset Balance ($)</label>
@@ -169,13 +179,13 @@ function renderDash(){
 
   return`<div>
 ${loanForm}
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+<div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
   ${stat('Current Balance',fA(bal),`as of ${fMo(nowYM())}`,C.red)}
   ${stat('Effective Balance',fA(eff),`Offset: ${fA(off)}`,C.blue)}
   ${stat('Interest Rate',`${rate}% p.a.`,'',C.amber)}
   ${stat('Offset Saves / Year',fA(off*rate/100),`${fA(off*rate/100/365)}/day`,C.green)}
 </div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+<div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
   <div class="surf">
     <div style="font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">Loan Progress</div>
     <div style="background:rgba(255,255,255,.06);border-radius:999px;height:8px;margin-bottom:8px;overflow:hidden">
@@ -227,7 +237,7 @@ ${loanForm}
 </div>
 <div class="surf" style="margin-bottom:20px">
   <div style="font-size:11px;color:${C.green};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">⚡ Offset Explorer</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+  <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:12px;color:${C.muted}">Offset balance</span>
@@ -259,7 +269,7 @@ ${loanForm}
   <p style="font-size:12px;color:${C.muted};margin:0 0 16px">Actual history · Your strategy · No-extras baseline</p>
   ${svgChart(chartData)}
 </div>
-<div style="display:flex;gap:12px;flex-wrap:wrap">
+<div class="dash-btns" style="display:flex;gap:12px;flex-wrap:wrap">
   ${pbtn('➕ Log Extra Payment','go-extra',C.blue)}
   ${pbtn('📅 View History','go-track',C.green)}
 </div></div>`;
@@ -336,7 +346,7 @@ function renderExtra(){
   <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px">➕ Extra Repayments Tracker</h2>
   <p style="font-size:12px;color:${C.muted};margin:0">Log any payments beyond your minimum — tax refunds, bonuses, windfalls.</p>
 </div>
-${total>0?`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+${total>0?`<div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
   ${stat('Total Extra Paid',fA(total),`${rows.length} payments`,C.green)}
   ${stat('Approx Annual Saving',`${fA(total*D.loan.rate/100)}/yr`,'if held in offset',C.amber)}
 </div>`:''}
@@ -518,7 +528,7 @@ function renderSett(){
 <div class="surf">
   <div style="font-size:13px;font-weight:700;margin-bottom:6px">Data Management</div>
   <p style="font-size:12px;color:${C.muted};margin:0 0 18px;line-height:1.6">Data lives in this browser's localStorage. Export regularly as a backup. Use Import to restore or move to a new device.</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
+  <div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
     ${pbtn('⬇ Export Backup','s-export',C.green)}
     ${pbtn('⬆ Import Backup','s-import',C.blue)}
     ${gbtn('🗑 Reset All Data','s-reset',C.red)}
@@ -841,7 +851,7 @@ function renderApp(){
 <div style="background:${C.surf};border-bottom:1px solid ${C.border};position:sticky;top:0;z-index:20">
   <div style="max-width:940px;margin:0 auto;padding:0 14px;display:flex;align-items:center;justify-content:space-between">
     <div style="display:flex;overflow-x:auto">
-      ${TABS.map(t=>`<button onclick="setTab('${t.id}')" style="padding:13px 12px;border:none;background:transparent;color:${TAB===t.id?C.blue:C.muted};font-weight:${TAB===t.id?700:500};font-size:12px;cursor:pointer;border-bottom:2px solid ${TAB===t.id?C.blue:'transparent'};display:flex;align-items:center;gap:5px;white-space:nowrap;transition:color .15s"><span>${t.i}</span><span>${t.l}</span></button>`).join('')}
+      ${TABS.map(t=>`<button onclick="setTab('${t.id}')" style="padding:13px 12px;border:none;background:transparent;color:${TAB===t.id?C.blue:C.muted};font-weight:${TAB===t.id?700:500};font-size:12px;cursor:pointer;border-bottom:2px solid ${TAB===t.id?C.blue:'transparent'};display:flex;align-items:center;gap:5px;white-space:nowrap;transition:color .15s"><span>${t.i}</span><span class="nav-lbl">${t.l}</span></button>`).join('')}
     </div>
     <div id="si" style="font-size:10px;color:${C.muted};font-family:'DM Mono',monospace;flex-shrink:0">Mortgage Dashboard</div>
   </div>
