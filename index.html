@@ -526,6 +526,100 @@ function renderSett(){
 }
 
 // ── EVENT ATTACHMENT ──────────────────────────────────────────────────────────
+// ── SUGGESTIONS ──────────────────────────────────────────────────────────────
+function renderSugg(){
+  const l=D.loan,bal=l.balance,off=l.offset,rate=l.rate||6.04,pmt=l.payment||5832;
+  if(!bal)return`<div style="text-align:center;padding:60px 20px;color:${C.muted};font-size:13px">
+    Enter your loan details in Overview first to see personalised suggestions.
+  </div>`;
+
+  const base=amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12});
+  const sv=(r)=>({
+    mo:isFinite(base.months)&&isFinite(r.months)?base.months-r.months:0,
+    int:isFinite(base.totalInt)&&isFinite(r.totalInt)?base.totalInt-r.totalInt:0
+  });
+
+  // Weekly amounts as monthly equivalents: $/wk × 52 ÷ 12
+  const wk50mo  = Math.round(50*52/12);   // $217/mo
+  const wk100mo = Math.round(100*52/12);  // $433/mo
+
+  const SUGG=[
+    {
+      icon:'🔄', color:C.blue,
+      title:'Switch to fortnightly payments',
+      detail:`Pay ${fA(Math.round(pmt/2))} every fortnight instead of ${fA(pmt)} monthly. You make 26 payments a year — that's one full extra payment annually with zero extra effort.`,
+      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2,ppy:26}),
+      act:{extra:0,fn:true,lump:0}
+    },
+    {
+      icon:'☕', color:C.orange,
+      title:'Add $50 per week',
+      detail:`${fA(wk50mo)}/month extra — roughly the cost of a few coffees a week. Small and sustainable, but the compounding impact over 20+ years is significant.`,
+      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk50mo,ppy:12}),
+      act:{extra:wk50mo,fn:false,lump:0}
+    },
+    {
+      icon:'💪', color:C.green,
+      title:'Add $100 per week',
+      detail:`${fA(wk100mo)}/month extra. A meaningful commitment that seriously dents the loan — and every dollar goes straight to principal since interest is already covered.`,
+      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk100mo,ppy:12}),
+      act:{extra:wk100mo,fn:false,lump:0}
+    },
+    {
+      icon:'🎁', color:C.amber,
+      title:'Throw your tax refund at it every year',
+      detail:`A $3,000 annual lump sum — the average Australian tax refund — applied directly each year. No change to your monthly budget, just redirecting money you already get back.`,
+      r:amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:3000}),
+      act:{extra:0,fn:false,lump:3000}
+    },
+    {
+      icon:'🪣', color:C.purple,
+      title:'Grow your offset by $10,000',
+      detail:`A one-time top-up of $10,000 into your offset saves ${fA(10000*rate/100)} per year in interest — every single year — and you keep the money. It's always there if you need it.`,
+      r:amort({balance:bal,offset:off+10000,ratePA:rate,pmt,ppy:12}),
+      act:null
+    },
+    {
+      icon:'🚀', color:C.green,
+      title:'Go fortnightly AND add $50/week',
+      detail:`Combine both strategies: fortnightly payments (${fA(Math.round(pmt/2+wk50mo/2))}/fn) plus the weekly extra. The compound effect of both together is greater than either alone.`,
+      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2+wk50mo/2,ppy:26}),
+      act:{extra:wk50mo,fn:true,lump:0}
+    },
+  ];
+
+  const cards=SUGG.map(s=>{
+    const{mo,int}=sv(s.r);
+    const badge=(txt,col)=>`<span style="padding:4px 10px;border-radius:6px;background:${col}20;color:${col};font-size:12px;font-weight:700;font-family:'DM Mono',monospace">${txt}</span>`;
+    const calcBtn=s.act?`<button onclick="goToCalc(${s.act.extra},${s.act.fn},${s.act.lump})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:${C.muted};font-size:12px;cursor:pointer">Try in Calculator →</button>`:'';
+    return`<div style="background:rgba(255,255,255,.02);border:1px solid ${C.border};border-left:3px solid ${s.color};border-radius:14px;padding:20px">
+      <div style="display:flex;align-items:flex-start;gap:14px">
+        <div style="font-size:26px;flex-shrink:0;margin-top:2px">${s.icon}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:15px;margin-bottom:5px">${s.title}</div>
+          <div style="font-size:13px;color:${C.muted};margin-bottom:12px;line-height:1.6">${s.detail}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            ${mo>0?badge('⏱ '+fY(mo)+' sooner',C.green):''}
+            ${int>0?badge('💰 Save '+fA(int),C.green):''}
+            ${calcBtn}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return`<div>
+<div style="margin-bottom:20px">
+  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:8px">💡 Personalised Suggestions</h2>
+  <p style="font-size:13px;color:${C.muted};margin:0;line-height:1.6">Based on your current loan of ${fA(bal)} at ${rate}% — every figure below is calculated against your actual numbers.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">${cards}</div>
+<div style="margin-top:20px;padding:14px 16px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.15);border-radius:12px;font-size:12px;color:#bae6fd;line-height:1.7">
+  💡 All comparisons are against your current baseline: ${fA(pmt)}/month with ${fA(off)} in offset, projected to pay off ${fD(base.months)}.
+</div>
+</div>`;
+}
+
 function attachEvents(){
   // Dashboard loan details save
   document.getElementById('d-save')?.addEventListener('click',()=>{
@@ -691,14 +785,15 @@ function attachEvents(){
 // ── GLOBAL HANDLERS (called via onclick in innerHTML) ─────────────────────────
 window.delHistory=id=>{D.history=D.history.filter(h=>h.id!==id);saveData();setTab('track');};
 window.delRepayment=id=>{D.repayments=D.repayments.filter(r=>r.id!==id);saveData();setTab('extra');};
+window.goToCalc=(extra,fn,lump)=>{CX.extra=extra;CX.fn=!!fn;CX.lump=lump;setTab('calc');};
 
 // ── MAIN RENDER ───────────────────────────────────────────────────────────────
-const TABS=[{id:'dash',i:'📊',l:'Overview'},{id:'track',i:'📅',l:'History'},{id:'extra',i:'➕',l:'Repayments'},{id:'calc',i:'🧮',l:'Calculator'},{id:'sett',i:'⚙️',l:'Settings'}];
+const TABS=[{id:'dash',i:'📊',l:'Overview'},{id:'track',i:'📅',l:'History'},{id:'extra',i:'➕',l:'Repayments'},{id:'calc',i:'🧮',l:'Calculator'},{id:'sugg',i:'💡',l:'Suggestions'},{id:'sett',i:'⚙️',l:'Settings'}];
 
 function setTab(id){TAB=id;renderApp();}
 
 function renderApp(){
-  const tabContent={dash:renderDash,track:renderTrack,extra:renderExtra,calc:renderCalc,sett:renderSett}[TAB]?.();
+  const tabContent={dash:renderDash,track:renderTrack,extra:renderExtra,calc:renderCalc,sugg:renderSugg,sett:renderSett}[TAB]?.();
   const cur=TABS.find(t=>t.id===TAB);
   document.getElementById('app').innerHTML=`
 <div style="background:${C.surf};border-bottom:1px solid ${C.border};position:sticky;top:0;z-index:20">
