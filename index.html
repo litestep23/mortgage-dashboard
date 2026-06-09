@@ -196,11 +196,28 @@ ${loanForm}
       ${kv('Daily offset saving',`${fA(off*rate/100/365)}/day`,C.blue)}
     </div>
     <div class="surf" style="flex:1">
-      <div style="font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Strategy Projection</div>
-      ${kv('Pay off',fD(proj.months))}
-      ${kv('Time remaining',fY(proj.months))}
-      ${kv('Saved vs no extras',moSaved>0?fY(moSaved)+' sooner':'—',C.green)}
-      ${kv('Total interest',fA(proj.totalInt))}
+      <div style="font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">Repayment Explorer</div>
+      <div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+          <span style="font-size:12px;color:${C.muted}">Monthly repayment</span>
+          <div>
+            <span id="d-pmt-lbl" style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:${C.blue}">${fA(l.payment||5832)}</span>
+            <span id="d-pmt-diff" style="font-size:11px;margin-left:8px;color:${C.muted}">base</span>
+          </div>
+        </div>
+        <input id="d-pmt-slider" type="range" min="3000" max="12000" step="100" value="${l.payment||5832}" style="width:100%;accent-color:${C.blue}">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:4px">
+          <span>$3K</span>
+          <span style="color:${C.amber}">base: ${fA(l.payment||5832)}</span>
+          <span>$12K</span>
+        </div>
+      </div>
+      <div id="d-proj-results">
+        ${kv('Pay off',fD(proj.months))}
+        ${kv('Time remaining',fY(proj.months))}
+        ${kv('Vs base repayment',moSaved>0?fY(moSaved)+' sooner':'—',C.green)}
+        ${kv('Total interest',fA(proj.totalInt))}
+      </div>
     </div>
   </div>
 </div>
@@ -500,6 +517,32 @@ function attachEvents(){
   // Dashboard nav buttons
   document.getElementById('go-track')?.addEventListener('click',()=>setTab('track'));
   document.getElementById('go-extra')?.addEventListener('click',()=>setTab('extra'));
+
+  // Repayment explorer slider — live projection updates without re-render
+  document.getElementById('d-pmt-slider')?.addEventListener('input',function(){
+    const pmt=+this.value, basePmt=D.loan.payment||5832;
+    const diff=pmt-basePmt;
+    const lbl=document.getElementById('d-pmt-lbl');
+    const dlbl=document.getElementById('d-pmt-diff');
+    if(lbl){lbl.textContent=fA(pmt);lbl.style.color=diff>0?C.green:diff<0?C.red:C.blue;}
+    if(dlbl){
+      dlbl.textContent=diff===0?'base':diff>0?`+${fA(diff)}/mo`:`${fA(diff)}/mo`;
+      dlbl.style.color=diff>0?C.green:diff<0?C.red:C.muted;
+    }
+    const l=D.loan;
+    if(!l.balance)return;
+    const baseP=amort({balance:l.balance,offset:l.offset,ratePA:l.rate,pmt:basePmt,ppy:12});
+    const newP =amort({balance:l.balance,offset:l.offset,ratePA:l.rate,pmt,ppy:12});
+    const mSav=isFinite(baseP.months)&&isFinite(newP.months)?baseP.months-newP.months:0;
+    const iSav=isFinite(baseP.totalInt)&&isFinite(newP.totalInt)?baseP.totalInt-newP.totalInt:0;
+    const el=document.getElementById('d-proj-results');
+    if(el)el.innerHTML=`
+      ${kv('Pay off',fD(newP.months))}
+      ${kv('Time remaining',fY(newP.months))}
+      ${kv(diff===0?'At base repayment':diff>0?'Sooner than base':'Later than base', mSav===0?'Baseline':mSav>0?fY(mSav)+' sooner':fY(Math.abs(mSav))+' longer', mSav>0?C.green:mSav<0?C.red:C.muted)}
+      ${kv('Total interest',fA(newP.totalInt)+(iSav>0?` <span style="color:${C.green};font-size:11px">(save ${fA(iSav)})</span>`:''))}
+    `;
+  });
 
   // History save
   document.getElementById('h-save')?.addEventListener('click',()=>{
