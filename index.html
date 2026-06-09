@@ -233,7 +233,10 @@ ${loanForm}
         <span style="font-size:12px;color:${C.muted}">Offset balance</span>
         <div style="display:flex;align-items:center;gap:8px">
           <button id="d-off-reset" style="padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:${C.muted};font-size:11px;cursor:pointer">↺ Reset</button>
-          <span id="d-off-lbl" style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:${C.green}">${fA(off)}</span>
+          <div style="display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.3);border:1px solid rgba(0,214,143,.35);border-radius:8px;padding:3px 10px">
+            <span style="font-family:'DM Mono',monospace;font-size:13px;color:${C.muted}">$</span>
+            <input id="d-off-input" type="text" inputmode="numeric" value="${Math.round(off).toLocaleString('en-AU')}" style="background:transparent;border:none;font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${C.green};width:82px;outline:none;text-align:right;padding:0">
+          </div>
           <span id="d-off-diff" style="font-size:11px;color:${C.muted}">current</span>
         </div>
       </div>
@@ -652,15 +655,22 @@ function attachEvents(){
     applyPmtValue(v);
   });
   document.getElementById('d-off-reset')?.addEventListener('click',()=>{
+    const v=D.loan.offset||0;
     const s=document.getElementById('d-off-slider');
-    if(s){s.value=Math.round((D.loan.offset||0)/5000)*5000;s.dispatchEvent(new Event('input'));}
+    const inp=document.getElementById('d-off-input');
+    if(s) s.value=Math.round(v/5000)*5000;
+    if(inp) inp.value=Math.round(v).toLocaleString('en-AU');
+    applyOffValue(v);
   });
 
-  // Offset explorer slider
-  document.getElementById('d-off-slider')?.addEventListener('input',function(){
-    const newOff=+this.value, baseOff=D.loan.offset||0, diff=newOff-baseOff;
-    const lbl=document.getElementById('d-off-lbl'),dlbl=document.getElementById('d-off-diff');
-    if(lbl){lbl.textContent=fA(newOff);lbl.style.color=diff<0?C.red:C.green;}
+  // Offset explorer — shared updater
+  function applyOffValue(newOff, fromInput=false) {
+    const baseOff=D.loan.offset||0, diff=newOff-baseOff;
+    const inp=document.getElementById('d-off-input'), dlbl=document.getElementById('d-off-diff');
+    const slider=document.getElementById('d-off-slider');
+    if(inp && !fromInput){ inp.value=Math.round(newOff).toLocaleString('en-AU'); inp.style.color=diff<0?C.red:C.green; }
+    if(inp && fromInput)  { inp.style.color=diff<0?C.red:C.green; }
+    if(slider && !fromInput) slider.value=Math.min(Math.max(newOff,0),300000);
     if(dlbl){dlbl.textContent=diff===0?'current':diff>0?`+${fA(diff)}`:fA(diff);dlbl.style.color=diff>0?C.green:diff<0?C.red:C.muted;}
     const l=D.loan, r=l.rate||6.04, p=l.payment||5832;
     const baseP=l.balance>0?amort({balance:l.balance,offset:baseOff,ratePA:r,pmt:p,ppy:12}):{months:Infinity,totalInt:Infinity};
@@ -677,6 +687,20 @@ function attachEvents(){
            mSav>0?C.green:mSav<0?C.red:C.muted)}
       ${iSav>0?kv('Total interest saved',fA(iSav)+' less',C.green):''}
     `;
+  }
+  // Offset explorer slider
+  document.getElementById('d-off-slider')?.addEventListener('input',function(){ applyOffValue(+this.value); });
+  // Manual text input
+  document.getElementById('d-off-input')?.addEventListener('input',function(){
+    const raw=this.value.replace(/[^0-9]/g,'');
+    if(!raw)return;
+    applyOffValue(+raw, true);
+  });
+  document.getElementById('d-off-input')?.addEventListener('blur',function(){
+    const raw=this.value.replace(/[^0-9]/g,'');
+    const v=Math.min(Math.max(+(raw||D.loan.offset||0),0),300000);
+    this.value=Math.round(v).toLocaleString('en-AU');
+    applyOffValue(v, true);
   });
 
   // Repayment explorer slider — live projection updates without re-render
