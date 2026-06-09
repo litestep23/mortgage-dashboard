@@ -222,6 +222,31 @@ ${loanForm}
   </div>
 </div>
 <div class="surf" style="margin-bottom:20px">
+  <div style="font-size:11px;color:${C.green};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">⚡ Offset Explorer</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <span style="font-size:12px;color:${C.muted}">Offset balance</span>
+        <div>
+          <span id="d-off-lbl" style="font-family:'DM Mono',monospace;font-weight:700;font-size:16px;color:${C.green}">${fA(off)}</span>
+          <span id="d-off-diff" style="font-size:11px;margin-left:8px;color:${C.muted}">current</span>
+        </div>
+      </div>
+      <input id="d-off-slider" type="range" min="0" max="300000" step="5000" value="${Math.round(off/5000)*5000}" style="width:100%;accent-color:${C.green}">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:4px">
+        <span>$0</span><span style="color:${C.amber}">current: ${fA(off)}</span><span>$300K</span>
+      </div>
+      <p style="font-size:11px;color:${C.muted};margin:10px 0 0;line-height:1.6">Drag to see what a higher offset balance would save in interest and how much earlier you'd pay off.</p>
+    </div>
+    <div id="d-off-results">
+      ${kv('Daily interest saved',fA(off*rate/100/365)+'/day',C.green)}
+      ${kv('Monthly interest saved',fA(off*rate/100/12)+'/mo',C.green)}
+      ${kv('Annual interest saved',fA(off*rate/100)+'/yr',C.green)}
+      ${kv('Payoff impact','— current baseline',C.muted)}
+    </div>
+  </div>
+</div>
+<div class="surf" style="margin-bottom:20px">
   <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:3px">📈 Balance Over Time</div>
   <p style="font-size:12px;color:${C.muted};margin:0 0 16px">Actual history · Your strategy · No-extras baseline</p>
   ${svgChart(chartData)}
@@ -517,6 +542,29 @@ function attachEvents(){
   // Dashboard nav buttons
   document.getElementById('go-track')?.addEventListener('click',()=>setTab('track'));
   document.getElementById('go-extra')?.addEventListener('click',()=>setTab('extra'));
+
+  // Offset explorer slider
+  document.getElementById('d-off-slider')?.addEventListener('input',function(){
+    const newOff=+this.value, baseOff=D.loan.offset||0, diff=newOff-baseOff;
+    const lbl=document.getElementById('d-off-lbl'),dlbl=document.getElementById('d-off-diff');
+    if(lbl){lbl.textContent=fA(newOff);lbl.style.color=diff<0?C.red:C.green;}
+    if(dlbl){dlbl.textContent=diff===0?'current':diff>0?`+${fA(diff)}`:fA(diff);dlbl.style.color=diff>0?C.green:diff<0?C.red:C.muted;}
+    const l=D.loan, r=l.rate||6.04, p=l.payment||5832;
+    const baseP=l.balance>0?amort({balance:l.balance,offset:baseOff,ratePA:r,pmt:p,ppy:12}):{months:Infinity,totalInt:Infinity};
+    const newP =l.balance>0?amort({balance:l.balance,offset:newOff, ratePA:r,pmt:p,ppy:12}):{months:Infinity,totalInt:Infinity};
+    const mSav=isFinite(baseP.months)&&isFinite(newP.months)?baseP.months-newP.months:0;
+    const iSav=isFinite(baseP.totalInt)&&isFinite(newP.totalInt)?baseP.totalInt-newP.totalInt:0;
+    const el=document.getElementById('d-off-results');
+    if(el)el.innerHTML=`
+      ${kv('Daily interest saved',fA(newOff*r/100/365)+'/day',C.green)}
+      ${kv('Monthly interest saved',fA(newOff*r/100/12)+'/mo',C.green)}
+      ${kv('Annual interest saved',fA(newOff*r/100)+'/yr',C.green)}
+      ${kv(diff===0?'Payoff impact':diff>0?'Sooner than now':'Later than now',
+           mSav===0?'Current baseline':mSav>0?fY(mSav)+' sooner':fY(Math.abs(mSav))+' longer',
+           mSav>0?C.green:mSav<0?C.red:C.muted)}
+      ${iSav>0?kv('Total interest saved',fA(iSav)+' less',C.green):''}
+    `;
+  });
 
   // Repayment explorer slider — live projection updates without re-render
   document.getElementById('d-pmt-slider')?.addEventListener('input',function(){
