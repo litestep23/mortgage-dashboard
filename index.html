@@ -184,49 +184,45 @@ ${reminderBanner()}
 <!-- PAYMENT LOGGER -->
 <div style="background:linear-gradient(135deg,rgba(0,214,143,.08),rgba(56,189,248,.04));border:1px solid rgba(0,214,143,.25);border-radius:18px;padding:22px;margin-bottom:20px">
   <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">📅 Record Monthly Payment</div>
-  <p style="font-size:12px;color:${C.muted};margin:0 0 18px">On the 13th, your bank automatically deducts ${fA(pmt)} from your offset account to pay the loan.</p>
+  <p style="font-size:12px;color:${C.muted};margin:0 0 18px">On the 13th, your bank automatically deducts ${fA(pmt)} from your offset account.</p>
 
   <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     <div>
-      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">Your offset balance ($)</label>
-      <input id="h-offset-now" value="${Math.round(lastOff)}" style="${INP}">
-      <div id="h-deducted-row" style="margin-top:12px">
-        <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:8px">Has the ${fA(pmt)} been deducted yet?</label>
-        <div style="display:flex;gap:10px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
-            <input type="radio" id="h-deducted-yes" name="h-deducted" value="yes" checked style="accent-color:${C.green}"> Yes — already deducted
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
-            <input type="radio" id="h-deducted-no" name="h-deducted" value="no" style="accent-color:${C.blue}"> Not yet
-          </label>
-        </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:12px;padding:14px;margin-bottom:14px;font-size:13px">
+        ${kv('Loan balance',fA(lastBal))}
+        ${kv('Offset balance',fA(lastOff))}
+        <div style="font-size:10px;color:${C.muted};margin-top:8px">Wrong? Update in <button onclick="setTab('tools');setTimeout(()=>secToggle('sett'),100)" style="background:none;border:none;color:${C.blue};font-size:10px;cursor:pointer;padding:0;font-family:'Mulish',sans-serif">Settings ↗</button></div>
       </div>
-      <div style="margin-top:12px">
-        <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">Note (optional)</label>
-        <input id="h-note" placeholder="e.g. Put in $800 extra this month" style="${INP}">
+      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:8px">Has the ${fA(pmt)} been deducted yet?</label>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+          <input type="radio" id="h-deducted-yes" name="h-deducted" value="yes" checked style="accent-color:${C.green}"> Yes — already deducted
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+          <input type="radio" id="h-deducted-no" name="h-deducted" value="no" style="accent-color:${C.blue}"> Not yet
+        </label>
       </div>
+      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">Note (optional)</label>
+      <input id="h-note" placeholder="e.g. Put in $800 extra this month" style="${INP}">
     </div>
-    <div id="h-preview" style="background:rgba(0,0,0,.2);border-radius:12px;padding:16px">
+    <div id="h-preview" style="background:rgba(0,0,0,.2);border-radius:12px;padding:16px;font-size:13px">
       ${(()=>{
-        const isDeducted=true;
-        const offsetBefore=isDeducted?(lastOff+pmt):lastOff;
+        const offsetBefore=lastOff+pmt;
         const int2=Math.max(0,lastBal-offsetBefore)*rate/100/12;
         const principal2=Math.max(0,pmt-int2);
         const newLoan=Math.round(Math.max(0,lastBal-principal2)*100)/100;
-        const newOffset=isDeducted?lastOff:lastOff-pmt;
         return`<div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
-          ${kv('Offset before deduction',fA(offsetBefore))}
-          ${kv('Interest charged','− '+fA(int2),C.red)}
-          ${kv('Principal paid',fA(principal2),C.green)}
-          <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
-            ${kv('New loan balance',fA2(newLoan),C.green)}
-            ${kv('New offset balance',fA(Math.max(0,newOffset)),C.blue)}
-          </div>`;
+        ${kv('Offset before deduction',fA(offsetBefore))}
+        ${kv('Interest charged','− '+fA(int2),C.red)}
+        ${kv('Principal paid',fA(principal2),C.green)}
+        <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
+          ${kv('New loan balance',fA(newLoan),C.green)}
+          ${kv('New offset balance',fA(lastOff),C.blue)}
+        </div>`;
       })()}
     </div>
   </div>
 
-  <!-- Rate change toggle -->
   <div style="margin-bottom:16px">
     <button id="h-rate-toggle" style="background:none;border:none;padding:0;color:${C.blue};font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px">
       <span id="h-rate-arrow">▶</span> Rate or repayment changed this month?
@@ -446,15 +442,14 @@ function attachEvents(){
   function updatePaymentPreview(){
     const lastEntry=D.history.length>0?D.history[D.history.length-1]:D.loan;
     const lastBal=lastEntry.balance||D.loan.balance||0;
-    const enteredOff=parseFloat((document.getElementById('h-offset-now')?.value||'').replace(/[^0-9.]/g,''))||0;
+    const storedOff=lastEntry.offset||D.loan.offset||0;
     const deducted=isDeducted();
     const pmt=D.loan.payment||5832, rate=D.loan.rate||6.04;
-    const offsetBefore=deducted?(enteredOff+pmt):enteredOff;
-    const offsetAfter=deducted?enteredOff:(enteredOff-pmt);
+    const offsetBefore=deducted?(storedOff+pmt):storedOff;
+    const offsetAfter=deducted?storedOff:Math.max(0,storedOff-pmt);
     const int2=Math.max(0,lastBal-offsetBefore)*rate/100/12;
     const principal2=Math.max(0,pmt-int2);
     const newLoan=Math.round(Math.max(0,lastBal-principal2)*100)/100;
-    const newOffset=Math.max(0,offsetAfter);
     const el=document.getElementById('h-preview');
     if(el)el.innerHTML=`
       <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
@@ -462,13 +457,12 @@ function attachEvents(){
       ${kv('Interest charged','− '+fA(int2),C.red)}
       ${kv('Principal paid',fA(principal2),C.green)}
       <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
-        ${kv('New loan balance',fA2(newLoan),C.green)}
-        ${kv('New offset balance',fA(newOffset),C.blue)}
+        ${kv('New loan balance',fA(newLoan),C.green)}
+        ${kv('New offset balance',fA(offsetAfter),C.blue)}
       </div>`;
-    return{newLoan,newOffset,int2,principal2};
+    return{newLoan,newOffset:offsetAfter};
   }
 
-  document.getElementById('h-offset-now')?.addEventListener('input',updatePaymentPreview);
   document.querySelectorAll('input[name="h-deducted"]').forEach(r=>r.addEventListener('change',updatePaymentPreview));
 
   document.getElementById('h-rate-toggle')?.addEventListener('click',()=>{
