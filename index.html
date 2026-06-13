@@ -18,36 +18,38 @@ table{width:100%;border-collapse:collapse}
 th{font-size:10px;color:#4b5674;text-transform:uppercase;letter-spacing:1.2px;padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}
 td{padding:10px;font-size:13px;color:#e2e8f5;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
 tr:hover td{background:rgba(255,255,255,.02)}
-.surf{background:#0c1018;border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:22px}
+.card{background:#0c1018;border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:22px}
 .tag{display:inline-block;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700}
 @media(max-width:640px){
   .g2{grid-template-columns:1fr!important}
   .nav-lbl{display:none}
-  .surf{padding:16px!important}
-  th{padding:6px 8px}
-  td{padding:8px;font-size:12px}
+  .card{padding:16px!important}
+  th{padding:6px 8px}td{padding:8px;font-size:12px}
   .stat-row>div{flex:1 1 calc(50% - 5px)!important;padding:12px 14px!important}
-  .dash-btns{flex-direction:column}
-  .dash-btns button{width:100%;text-align:center}
 }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
-// ── NO EXTERNAL DEPENDENCIES — pure vanilla JS ────────────────────────────────
-const C={bg:'#07090f',surf:'#0c1018',border:'rgba(255,255,255,.07)',text:'#e2e8f5',muted:'#4b5674',green:'#00d68f',blue:'#38bdf8',amber:'#fbbf24',red:'#f87171',purple:'#c084fc',orange:'#fb923c'};
-const INP=`background:#111827;border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f5;font-size:13px;padding:8px 10px;width:100%`;
 const SK='mortgageDashV1';
+const INIT={loan:{balance:928418.3,offset:78642.01,rate:6.04,payment:5832,origBalance:1025257,origEnd:'2051-09'},strategy:{extraMonthly:250,fortnightly:false,annualLump:4000},history:[],repayments:[]};
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const fA=n=>!isFinite(n)?'—':new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(n);
+const fA2=n=>!isFinite(n)?'—':new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
 const fD=m=>{if(!isFinite(m)||m>900)return'—';const d=new Date();d.setMonth(d.getMonth()+Math.round(m));return d.toLocaleDateString('en-AU',{month:'short',year:'numeric'})};
 const fY=m=>{if(!isFinite(m)||m>900||m<0)return'—';const y=Math.floor(m/12),mo=Math.round(m%12);return y===0?`${mo}mo`:mo===0?`${y}y`:`${y}y ${mo}mo`};
 const fMo=s=>{if(!s)return'';const[y,m]=s.split('-');return new Date(+y,+m-1).toLocaleDateString('en-AU',{month:'short',year:'numeric'})};
 const nowYM=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};
 const gid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const pn=id=>parseFloat((document.getElementById(id)?.value||'').replace(/[^0-9.]/g,''))||0;
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+let D=(() =>{try{const r=localStorage.getItem(SK);return r?JSON.parse(r):null}catch{return null}})() || JSON.parse(JSON.stringify(INIT));
+function saveData(){try{localStorage.setItem(SK,JSON.stringify(D));flashSaved()}catch(e){}}
+function flashSaved(){const el=document.getElementById('si');if(el){el.textContent='✓ Saved';el.style.color='#00d68f';setTimeout(()=>{el.textContent='';el.style.color='#4b5674'},2500)}}
 
 // ── Amortise ──────────────────────────────────────────────────────────────────
 function amort({balance,offset,ratePA,pmt,ppy=12,lump=0}){
@@ -65,884 +67,452 @@ function amort({balance,offset,ratePA,pmt,ppy=12,lump=0}){
   return{months:ppy===12?p:Math.round(p/ppy*12),totalInt:ti,pts};
 }
 
-// ── Storage ───────────────────────────────────────────────────────────────────
-function loadData(){try{const r=localStorage.getItem(SK);return r?JSON.parse(r):null}catch{return null}}
-function saveData(){try{localStorage.setItem(SK,JSON.stringify(D));flashSaved()}catch(e){}}
-function flashSaved(){const el=document.getElementById('si');if(el){el.textContent='✓ Saved';el.style.color=C.green;setTimeout(()=>{el.textContent='Mortgage Dashboard';el.style.color=C.muted},2500)}}
+// ── Shared helpers ────────────────────────────────────────────────────────────
+const C={bg:'#07090f',surf:'#0c1018',border:'rgba(255,255,255,.07)',text:'#e2e8f5',muted:'#4b5674',green:'#00d68f',blue:'#38bdf8',amber:'#fbbf24',red:'#f87171',purple:'#c084fc',orange:'#fb923c'};
+const INP=`background:#111827;border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f5;font-size:14px;padding:10px 12px;width:100%`;
+const kv=(l,v,c)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${C.border}"><span style="font-size:12px;color:${C.muted}">${l}</span><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${c||C.text}">${v}</span></div>`;
+const pbtn=(l,id,bg)=>`<button id="${id}" style="padding:10px 20px;border-radius:8px;border:none;background:${bg};color:#07090f;font-weight:700;font-size:14px">${l}</button>`;
 
-const INIT={loan:{balance:928418.3,offset:78642.01,rate:6.04,payment:5832,origBalance:1025257,origEnd:'2051-09'},strategy:{extraMonthly:250,fortnightly:false,annualLump:4000},history:[],repayments:[]};
-let D=loadData()||JSON.parse(JSON.stringify(INIT));
-let TAB='dash';
+// ── Transfer reminders ────────────────────────────────────────────────────────
+function reminderBanner(){
+  const pending=D.history.filter(h=>h.extra>0&&!h.extraTransferred);
+  if(!pending.length)return'';
+  return pending.map(p=>`<div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);border-radius:14px;padding:16px 18px;margin-bottom:18px;display:flex;gap:14px;align-items:flex-start">
+    <span style="font-size:20px;flex-shrink:0">⏰</span>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:14px;color:${C.amber};margin-bottom:4px">Transfer Reminder — ${fMo(p.month)}</div>
+      <p style="font-size:13px;color:${C.muted};margin:0 0 10px;line-height:1.6">You paid <strong style="color:${C.text}">${fA(p.extra)}</strong> above your minimum. This is sitting in your offset — to reduce the actual loan balance, transfer <strong style="color:${C.amber}">${fA(p.extra)}</strong> directly to your loan account.</p>
+      <button onclick="markTransferred('${p.id}')" style="padding:7px 16px;border-radius:7px;border:none;background:${C.amber};color:#07090f;font-weight:700;font-size:12px;cursor:pointer">✓ Done — I've transferred it</button>
+    </div>
+  </div>`).join('');
+}
 
-// ── Chart ─────────────────────────────────────────────────────────────────────
-function buildChart(hist,proj,base){
+// ── SVG chart (simple) ────────────────────────────────────────────────────────
+function svgChart(hist,proj,base){
   const baseYear=new Date().getFullYear();
   const hM={},pM={},bM={};
   hist.forEach(h=>{const yr=h.month?parseInt(h.month.split('-')[0])-baseYear:0;if(yr>=0)hM[yr]=h.balance});
   proj.pts.forEach(p=>pM[p.y]=p.b);
   base.pts.forEach(p=>bM[p.y]=p.b);
-  return Array.from({length:31},(_,y)=>{
+  const data=Array.from({length:31},(_,y)=>{
     const pt={year:y,label:String(baseYear+y)};
     if(hM[y]!=null)pt.actual=hM[y];
     if(pM[y]!=null)pt.projected=pM[y];else if(isFinite(proj.months)&&y>proj.months/12)pt.projected=0;
     if(bM[y]!=null)pt.noExtra=bM[y];else if(isFinite(base.months)&&y>base.months/12)pt.noExtra=0;
     return pt;
   });
-}
-
-function svgChart(data){
-  const W=800,H=190,PL=56,PB=24,PT=8,PR=8,iW=W-PL-PR,iH=H-PT-PB;
+  const W=800,H=180,PL=56,PB=24,PT=8,PR=8,iW=W-PL-PR,iH=H-PT-PB;
   const allV=data.flatMap(d=>[d.actual,d.projected,d.noExtra].filter(v=>v!=null));
   if(!allV.length)return'';
   const maxY=Math.max(...allV)||1;
   const px=y=>PL+(y/30)*iW,py=v=>PT+iH-(v/maxY)*iH;
   const pts=key=>data.filter(d=>d[key]!=null).map(d=>`${px(d.year).toFixed(0)},${py(d[key]).toFixed(0)}`).join(' ');
-  const yTk=[0,.25,.5,.75,1].map(t=>({v:maxY*t,y:py(maxY*t)}));
   const xTk=data.filter(d=>d.year%5===0);
-  return`<div>
-<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
-  ${yTk.map(t=>`<line x1="${PL}" x2="${W-PR}" y1="${t.y.toFixed(0)}" y2="${t.y.toFixed(0)}" stroke="rgba(255,255,255,.04)"/>
-  <text x="${PL-4}" y="${(t.y+4).toFixed(0)}" text-anchor="end" font-size="10" fill="${C.muted}">$${(t.v/1000).toFixed(0)}K</text>`).join('')}
-  ${xTk.map(d=>`<text x="${px(d.year).toFixed(0)}" y="${H-3}" text-anchor="middle" font-size="10" fill="${C.muted}">${d.label}</text>`).join('')}
-  ${pts('noExtra')?`<polyline points="${pts('noExtra')}" fill="none" stroke="${C.red}" stroke-width="1.5" stroke-dasharray="5,3"/>`:''}
-  ${pts('projected')?`<polyline points="${pts('projected')}" fill="none" stroke="${C.blue}" stroke-width="2"/>`:''}
-  ${pts('actual')?`<polyline points="${pts('actual')}" fill="none" stroke="${C.green}" stroke-width="2.5"/>`:''}
-  ${data.filter(d=>d.actual!=null).map(d=>`<circle cx="${px(d.year).toFixed(0)}" cy="${py(d.actual).toFixed(0)}" r="4" fill="${C.green}" stroke="${C.bg}" stroke-width="2"/>`).join('')}
-</svg>
-<div style="display:flex;gap:18px;font-size:11px;color:${C.muted};justify-content:center;margin-top:6px">
-  <span style="display:flex;align-items:center;gap:5px"><svg width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${C.red}" stroke-width="1.5" stroke-dasharray="4,3"/></svg>No extras</span>
-  <span style="display:flex;align-items:center;gap:5px"><svg width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${C.blue}" stroke-width="2"/></svg>Strategy</span>
-  <span style="display:flex;align-items:center;gap:5px"><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="${C.green}"/></svg>Actual</span>
-</div></div>`;
+  const yTk=[0,.5,1].map(t=>({v:maxY*t,y:py(maxY*t)}));
+  return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
+    ${yTk.map(t=>`<line x1="${PL}" x2="${W-PR}" y1="${t.y.toFixed(0)}" y2="${t.y.toFixed(0)}" stroke="rgba(255,255,255,.04)"/>
+    <text x="${PL-4}" y="${(t.y+4).toFixed(0)}" text-anchor="end" font-size="10" fill="${C.muted}">$${(t.v/1000).toFixed(0)}K</text>`).join('')}
+    ${xTk.map(d=>`<text x="${px(d.year).toFixed(0)}" y="${H-3}" text-anchor="middle" font-size="10" fill="${C.muted}">${d.label}</text>`).join('')}
+    ${pts('noExtra')?`<polyline points="${pts('noExtra')}" fill="none" stroke="${C.red}" stroke-width="1.5" stroke-dasharray="5,3"/>`:''}
+    ${pts('projected')?`<polyline points="${pts('projected')}" fill="none" stroke="${C.blue}" stroke-width="2"/>`:''}
+    ${pts('actual')?`<polyline points="${pts('actual')}" fill="none" stroke="${C.green}" stroke-width="2.5"/>`:''}
+    ${data.filter(d=>d.actual!=null).map(d=>`<circle cx="${px(d.year).toFixed(0)}" cy="${py(d.actual).toFixed(0)}" r="4" fill="${C.green}" stroke="${C.bg}" stroke-width="2"/>`).join('')}
+  </svg>
+  <div style="display:flex;gap:16px;font-size:11px;color:${C.muted};justify-content:center;margin-top:6px">
+    <span><svg width="18" height="8" style="vertical-align:middle;margin-right:4px"><line x1="0" y1="4" x2="18" y2="4" stroke="${C.red}" stroke-width="1.5" stroke-dasharray="4,3"/></svg>No extras</span>
+    <span><svg width="18" height="8" style="vertical-align:middle;margin-right:4px"><line x1="0" y1="4" x2="18" y2="4" stroke="${C.blue}" stroke-width="2"/></svg>Your strategy</span>
+    <span><svg width="8" height="8" style="vertical-align:middle;margin-right:4px"><circle cx="4" cy="4" r="3" fill="${C.green}"/></svg>Actual</span>
+  </div>`;
 }
 
-// ── Shared HTML helpers ───────────────────────────────────────────────────────
-const stat=(l,v,sub,accent)=>`<div style="flex:1 1 130px;padding:14px 16px;background:rgba(255,255,255,.03);border:1px solid ${C.border};border-top:2px solid ${accent};border-radius:13px">
-  <div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.4px;margin-bottom:5px">${l}</div>
-  <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700">${v}</div>
-  ${sub?`<div style="font-size:11px;color:${C.muted};margin-top:3px">${sub}</div>`:''}
-</div>`;
-
-const kv=(l,v,c)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${C.border}">
-  <span style="font-size:12px;color:${C.muted}">${l}</span>
-  <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${c||C.text}">${v}</span>
-</div>`;
-
-const pbtn=(l,id,bg)=>`<button id="${id}" style="padding:9px 18px;border-radius:8px;border:none;background:${bg||C.blue};color:#07090f;font-weight:700;font-size:13px">${l}</button>`;
-const gbtn=(l,id,col)=>`<button id="${id}" style="padding:9px 18px;border-radius:8px;border:1px solid ${col}40;background:${col}15;color:${col};font-weight:600;font-size:13px">${l}</button>`;
-
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
-// ── TRANSFER REMINDER ────────────────────────────────────────────────────────
-function getPendingTransfers(){
-  return D.history.filter(h=>h.extra>0&&!h.extraTransferred);
-}
-
-function reminderBanner(){
-  const pending=getPendingTransfers();
-  if(!pending.length)return'';
-  return pending.map(p=>`
-    <div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);border-radius:14px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:flex-start;gap:14px">
-      <span style="font-size:22px;flex-shrink:0">⏰</span>
-      <div style="flex:1">
-        <div style="font-weight:700;font-size:14px;color:${C.amber};margin-bottom:5px">Transfer Reminder — ${fMo(p.month)}</div>
-        <p style="font-size:13px;color:${C.muted};margin:0 0 12px;line-height:1.6">
-          You paid <strong style="color:${C.text}">${fA(p.extra)}</strong> above your minimum repayment in ${fMo(p.month)}.
-          That extra amount is currently sitting in your <strong style="color:${C.text}">offset account</strong> — it's saving you interest but your actual loan balance hasn't changed.
-          To reduce the principal, log into your bank and transfer <strong style="color:${C.amber}">${fA(p.extra)}</strong> directly to your loan account.
-        </p>
-        <button onclick="markTransferred('${p.id}')" style="padding:8px 18px;border-radius:8px;border:none;background:${C.amber};color:#07090f;font-weight:700;font-size:13px;cursor:pointer;font-family:'Mulish',sans-serif">✓ Done — I've transferred it to the loan</button>
-      </div>
-    </div>`).join('');
-}
-
+// ═══════════════════════════════════════════════════════════════════════
+// DASHBOARD — the daily driver
+// ═══════════════════════════════════════════════════════════════════════
 function renderDash(){
-  const l=D.loan,hist=D.history;
-  const{balance:bal,offset:off,rate}=l;
+  const l=D.loan,bal=l.balance,off=l.offset,rate=l.rate||6.04,pmt=l.payment||5832;
   const eff=Math.max(0,bal-off);
-  const st=D.strategy,pmt=st.fortnightly?(l.payment+st.extraMonthly)/2:(l.payment+st.extraMonthly),ppy=st.fortnightly?26:12;
-  const proj=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump:st.annualLump}):{months:Infinity,totalInt:Infinity,pts:[]};
-  const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:l.payment||5832,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]};
+  const proj=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]};
   const origBal=l.origBalance||bal||1;
   const paidPct=origBal>0?((origBal-bal)/origBal*100).toFixed(1):'0.0';
-  const dropped=hist.length>0?hist[0].balance-bal:0;
-  const moSaved=isFinite(base.months)&&isFinite(proj.months)?base.months-proj.months:0;
-  const totalExtra=D.repayments.reduce((s,r)=>s+r.amount,0);
-  const chartData=buildChart(hist,proj,base);
+  const lastEntry=D.history.length>0?D.history[D.history.length-1]:null;
+  const dropped=lastEntry?(D.history[0].balance-bal):0;
 
-  const loanForm=`<div style="background:linear-gradient(135deg,rgba(56,189,248,.06),rgba(192,132,252,.03));border:1px solid rgba(56,189,248,.18);border-radius:18px;padding:22px;margin-bottom:22px">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-    <span style="font-size:13px;font-weight:700">📋 Loan Details</span>
-    <span style="font-size:11px;color:${C.muted}">— update these each month, everything below recalculates instantly</span>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Loan Balance ($)</label>
-      <input id="d-bal" value="${l.balance?Math.round(l.balance*100)/100:''}" placeholder="e.g. 928418" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Offset Balance ($)</label>
-      <input id="d-off" value="${l.offset?Math.round(l.offset*100)/100:''}" placeholder="e.g. 78642" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Interest Rate (% p.a.)</label>
-      <input id="d-rate" value="${l.rate||''}" placeholder="6.04" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Monthly Repayment ($)</label>
-      <input id="d-pmt" value="${l.payment||''}" placeholder="e.g. 5832" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original Loan Amount ($)</label>
-      <input id="d-orig" value="${l.origBalance||''}" placeholder="e.g. 1025257" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label>
-      <input id="d-end" value="${l.origEnd||''}" placeholder="2051-09" style="${INP}"></div>
-  </div>
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    ${pbtn('💾 Save & Update','d-save',C.blue)}
-    <span id="d-msg" style="font-size:11px;color:${C.green};font-family:'DM Mono',monospace"></span>
-  </div>
-</div>`;
+  // Payment preview calc
+  const lastBal=lastEntry?.balance||bal;
+  const lastOff=lastEntry?.offset||off;
+  const initInt=Math.max(0,lastBal-lastOff)*rate/100/12;
+  const initPrincipal=Math.max(0,pmt-initInt);
+  const initNewBal=Math.round(Math.max(0,lastBal-initPrincipal)*100)/100;
 
-  if(!bal)return`<div>${loanForm}
-    <div style="text-align:center;padding:30px 20px;color:${C.muted};font-size:13px">
-      Fill in your loan details above and hit Save — your dashboard will appear here.
-    </div>
+  if(!bal)return`<div style="text-align:center;padding:60px 20px;color:${C.muted}">
+    <div style="font-size:40px;margin-bottom:16px">🏠</div>
+    <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:${C.text};margin-bottom:8px">Welcome</div>
+    <p style="font-size:14px;line-height:1.7;margin-bottom:24px">Set up your loan details in <strong style="color:${C.text}">Tools → Settings</strong> to get started.</p>
+    <button onclick="setTab('tools')" style="padding:10px 24px;border-radius:8px;border:none;background:${C.blue};color:#07090f;font-weight:700;font-size:14px;cursor:pointer">Go to Settings →</button>
   </div>`;
 
   return`<div>
-${loanForm}
 ${reminderBanner()}
+
+<!-- STATS ROW -->
 <div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
-  ${stat('Current Balance',fA(bal),`as of ${fMo(nowYM())}`,C.red)}
-  ${stat('Effective Balance',fA(eff),`Offset: ${fA(off)}`,C.blue)}
-  ${stat('Interest Rate',`${rate}% p.a.`,'',C.amber)}
-  ${stat('Offset Saves / Year',fA(off*rate/100),`${fA(off*rate/100/365)}/day`,C.green)}
+  ${[
+    ['Loan Balance',fA(bal),C.red,''],
+    ['Offset',fA(off),C.green,''],
+    ['Effective Balance',fA(eff),C.blue,'loan − offset'],
+    ['Interest Rate',`${rate}%`,C.amber,'p.a.'],
+  ].map(([l,v,c,s])=>`<div style="flex:1 1 130px;padding:14px 16px;background:rgba(255,255,255,.03);border:1px solid ${C.border};border-top:2px solid ${c};border-radius:13px">
+    <div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.4px;margin-bottom:5px">${l}</div>
+    <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${C.text}">${v}</div>
+    ${s?`<div style="font-size:10px;color:${C.muted};margin-top:2px">${s}</div>`:''}
+  </div>`).join('')}
 </div>
-<div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-  <div class="surf">
-    <div style="font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">Loan Progress</div>
-    <div style="background:rgba(255,255,255,.06);border-radius:999px;height:8px;margin-bottom:8px;overflow:hidden">
-      <div style="width:${paidPct}%;height:100%;background:linear-gradient(90deg,${C.green},${C.blue});border-radius:999px"></div>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;color:${C.muted};margin-bottom:14px">
-      <span>0</span><span style="color:${C.text};font-weight:700">${paidPct}% paid off</span><span>${fA(origBal)}</span>
-    </div>
-    ${kv('Balance reduced since tracking',fA(dropped),C.green)}
-    ${kv('Extra repayments logged',fA(totalExtra),C.green)}
-    ${kv('Months tracked',`${hist.length}`)}
+
+<!-- PAYOFF HERO -->
+<div style="background:linear-gradient(135deg,rgba(56,189,248,.08),rgba(0,214,143,.05));border:1px solid rgba(56,189,248,.2);border-radius:18px;padding:22px;margin-bottom:20px;text-align:center">
+  <div style="font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:2px;margin-bottom:8px">Projected Payoff</div>
+  <div style="font-family:'Syne',sans-serif;font-size:clamp(28px,6vw,42px);font-weight:800;color:${C.text};letter-spacing:-1px;margin-bottom:6px">${fD(proj.months)}</div>
+  <div style="font-size:15px;color:${C.blue};font-weight:600">${fY(proj.months)} remaining</div>
+  ${isFinite(proj.totalInt)?`<div style="font-size:12px;color:${C.muted};margin-top:6px">${fA(proj.totalInt)} total interest at current pace</div>`:''}
+</div>
+
+<!-- PROGRESS -->
+<div class="card" style="margin-bottom:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <span style="font-size:13px;font-weight:600">Loan paid off</span>
+    <span style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:${C.green}">${paidPct}%</span>
   </div>
-  <div style="display:flex;flex-direction:column;gap:12px">
-    <div style="background:linear-gradient(135deg,rgba(0,214,143,.08),rgba(56,189,248,.04));border:1px solid rgba(0,214,143,.2);border-radius:18px;padding:18px">
-      <div style="font-size:11px;color:${C.green};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">This Month</div>
-      ${kv('Interest charge',fA(eff*rate/100/12),C.red)}
-      ${kv('Principal reduction',fA((l.payment||0)-eff*rate/100/12),C.green)}
-      ${kv('Daily offset saving',`${fA(off*rate/100/365)}/day`,C.blue)}
-    </div>
-    <div class="surf" style="flex:1">
-      <div style="font-size:11px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">Repayment Explorer</div>
-      <div style="margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:12px;color:${C.muted}">Monthly repayment</span>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button id="d-pmt-reset" style="padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:${C.muted};font-size:11px;cursor:pointer">↺ Reset</button>
-            <div style="display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.3);border:1px solid rgba(56,189,248,.35);border-radius:8px;padding:3px 10px">
-              <span style="font-family:'DM Mono',monospace;font-size:13px;color:${C.muted}">$</span>
-              <input id="d-pmt-input" type="text" inputmode="numeric" value="${(l.payment||5832).toLocaleString('en-AU')}" style="background:transparent;border:none;font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${C.blue};width:72px;outline:none;text-align:right;padding:0">
-            </div>
-            <span id="d-pmt-diff" style="font-size:11px;color:${C.muted}">base</span>
-          </div>
-        </div>
-        <input id="d-pmt-slider" type="range" min="3000" max="12000" step="100" value="${l.payment||5832}" style="width:100%;accent-color:${C.blue}">
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:4px">
-          <span>$3K</span>
-          <span style="color:${C.amber}">base: ${fA(l.payment||5832)}</span>
-          <span>$12K</span>
-        </div>
-      </div>
-      <div id="d-proj-results">
-        ${kv('Pay off',fD(proj.months))}
-        ${kv('Time remaining',fY(proj.months))}
-        ${kv('Vs base repayment',moSaved>0?fY(moSaved)+' sooner':'—',C.green)}
-        ${kv('Total interest',fA(proj.totalInt))}
-      </div>
-    </div>
+  <div style="background:rgba(255,255,255,.06);border-radius:999px;height:10px;overflow:hidden;margin-bottom:10px">
+    <div style="width:${paidPct}%;height:100%;background:linear-gradient(90deg,${C.green},${C.blue});border-radius:999px;transition:width .5s"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:12px;color:${C.muted}">
+    <span>${fA(origBal)} original</span>
+    ${dropped>0?`<span style="color:${C.green}">↓ ${fA(dropped)} reduced since tracking</span>`:''}
+    <span>${fA(bal)} remaining</span>
   </div>
 </div>
-<div class="surf" style="margin-bottom:20px">
-  <div style="font-size:11px;color:${C.green};text-transform:uppercase;letter-spacing:1px;margin-bottom:14px">⚡ Offset Explorer</div>
-  <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+<!-- PAYMENT LOGGER -->
+<div style="background:linear-gradient(135deg,rgba(0,214,143,.08),rgba(56,189,248,.04));border:1px solid rgba(0,214,143,.25);border-radius:18px;padding:22px;margin-bottom:20px">
+  <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">Log a Payment</div>
+  <p style="font-size:12px;color:${C.muted};margin:0 0 18px">Enter what you paid — the new balance is calculated for you.</p>
+  <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-size:12px;color:${C.muted}">Offset balance</span>
-        <div style="display:flex;align-items:center;gap:8px">
-          <button id="d-off-reset" style="padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:${C.muted};font-size:11px;cursor:pointer">↺ Reset</button>
-          <div style="display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.3);border:1px solid rgba(0,214,143,.35);border-radius:8px;padding:3px 10px">
-            <span style="font-family:'DM Mono',monospace;font-size:13px;color:${C.muted}">$</span>
-            <input id="d-off-input" type="text" inputmode="numeric" value="${Math.round(off).toLocaleString('en-AU')}" style="background:transparent;border:none;font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${C.green};width:82px;outline:none;text-align:right;padding:0">
-          </div>
-          <span id="d-off-diff" style="font-size:11px;color:${C.muted}">current</span>
-        </div>
-      </div>
-      <input id="d-off-slider" type="range" min="0" max="300000" step="5000" value="${Math.round(off/5000)*5000}" style="width:100%;accent-color:${C.green}">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:4px">
-        <span>$0</span><span style="color:${C.amber}">current: ${fA(off)}</span><span>$300K</span>
-      </div>
-      <p style="font-size:11px;color:${C.muted};margin:10px 0 0;line-height:1.6">Drag to see what a higher offset balance would save in interest and how much earlier you'd pay off.</p>
+      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">How much did you pay? ($)</label>
+      <input id="h-paid" value="${pmt}" style="${INP}">
+      <div style="font-size:10px;color:${C.muted};margin-top:4px">Minimum is ${fA(pmt)} — enter whatever you actually paid</div>
     </div>
-    <div id="d-off-results">
-      ${kv('Daily interest saved',fA(off*rate/100/365)+'/day',C.green)}
-      ${kv('Monthly interest saved',fA(off*rate/100/12)+'/mo',C.green)}
-      ${kv('Annual interest saved',fA(off*rate/100)+'/yr',C.green)}
-      ${kv('Payoff impact','— current baseline',C.muted)}
+    <div>
+      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">Offset balance today ($)</label>
+      <input id="h-off" value="${Math.round(lastOff)}" style="${INP}">
     </div>
   </div>
+
+  <!-- Live preview -->
+  <div id="h-preview" style="background:rgba(0,0,0,.2);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+      <span style="color:${C.muted}">Interest: <strong style="color:${C.red};font-family:'DM Mono',monospace">${fA(initInt)}</strong></span>
+      <span style="color:${C.muted}">Principal: <strong style="color:${C.green};font-family:'DM Mono',monospace">${fA(initPrincipal)}</strong></span>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">New balance</div>
+      <div id="h-newbal" style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:${C.green}">${fA2(initNewBal)}</div>
+    </div>
+  </div>
+
+  <!-- Rate change toggle -->
+  <div style="margin-bottom:16px">
+    <button id="h-rate-toggle" style="background:none;border:none;padding:0;color:${C.blue};font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px">
+      <span id="h-rate-arrow">▶</span> Rate or repayment changed this month?
+    </button>
+    <div id="h-rate-panel" style="display:none;margin-top:12px;padding:14px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:10px">
+      <div style="font-size:12px;color:${C.amber};font-weight:600;margin-bottom:10px">Update rate &amp; repayment</div>
+      <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">New interest rate (% p.a.)</label>
+          <input id="h-rate" type="number" step="0.01" value="${rate}" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">New minimum repayment ($)</label>
+          <input id="h-newpmt" value="${pmt}" style="${INP}"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    ${pbtn('✓ Record Payment','h-save',C.green)}
+    <span style="font-size:11px;color:${C.muted}">Month: ${fMo(nowYM())}</span>
+    <span id="h-msg" style="font-size:12px;color:${C.green};font-family:'DM Mono',monospace"></span>
+  </div>
 </div>
-<div class="surf" style="margin-bottom:20px">
+
+<!-- CHART -->
+${D.history.length>1?`<div class="card">
   <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:3px">📈 Balance Over Time</div>
-  <p style="font-size:12px;color:${C.muted};margin:0 0 16px">Actual history · Your strategy · No-extras baseline</p>
-  ${svgChart(chartData)}
-</div>
-<div class="dash-btns" style="display:flex;gap:12px;flex-wrap:wrap">
-  ${pbtn('➕ Log Extra Payment','go-extra',C.blue)}
-  ${pbtn('📅 View History','go-track',C.green)}
-</div></div>`;
-}
-
-// ── HISTORY ───────────────────────────────────────────────────────────────────
-function renderTrack(){
-  const lastEntry=D.history.length>0?D.history[D.history.length-1]:D.loan;
-  const lastBal=lastEntry.balance||D.loan.balance||0;
-  const lastOff=lastEntry.offset||D.loan.offset||0;
-  const rate=D.loan.rate||6.04, minPmt=D.loan.payment||5832;
-
-  function calcPmt(bal,off,r,paid){
-    const int=Math.max(0,bal-off)*r/100/12;
-    const principal=Math.max(0,paid-int);
-    const newBal=Math.round(Math.max(0,bal-principal)*100)/100;
-    const extra=Math.max(0,paid-minPmt);
-    return{int,principal,newBal,extra};
-  }
-  const init=calcPmt(lastBal,lastOff,rate,minPmt);
-
-  const rows=[...D.history].sort((a,b)=>b.month.localeCompare(a.month));
-  const tableRows=rows.map((h,i)=>{
-    const nx=rows[i+1],ch=nx?h.balance-nx.balance:null;
-    const chStr=ch!=null?`<span style="font-family:'DM Mono',monospace;color:${ch>0?C.green:C.red};font-weight:600">${ch>0?'↓':ch<0?'↑':'–'}${ch!==0?' '+fA(Math.abs(ch)):''}</span>`:'';
-    return`<tr>
-      <td><span style="font-family:'DM Mono',monospace;font-weight:600">${fMo(h.month)}</span></td>
-      <td style="font-family:'DM Mono',monospace">${fA(h.balance)}</td>
-      <td style="font-family:'DM Mono',monospace;color:${C.green}">${fA(h.offset)}</td>
-      <td style="font-family:'DM Mono',monospace;color:${C.blue}">${fA(Math.max(0,h.balance-h.offset))}</td>
-      <td>${chStr}</td>
-      <td style="color:${C.muted};font-size:12px">${esc(h.note)||'—'}</td>
-      <td><button onclick="delHistory('${h.id}')" style="background:none;border:none;color:${C.muted};font-size:14px;padding:2px 6px;cursor:pointer">✕</button></td>
-    </tr>`;
-  }).join('');
-
-  const previewHTML=(int,principal,paid,extra,newBal)=>`
-    <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
-    ${kv('Starting balance',fA(lastBal))}
-    ${kv('Interest charged','− '+fA(int),C.red)}
-    ${kv('You paid','+ '+fA(paid),C.blue)}
-    <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
-      ${kv('Principal paid',fA(principal),C.green)}
-      ${extra>0?`<div style="margin-top:6px;padding:8px 10px;background:rgba(0,214,143,.08);border-radius:8px;font-size:12px;color:#6ee7b7">
-        ✓ <strong>${fA(extra)}</strong> above your minimum — automatically logged as extra repayment
-      </div>`:''}
-    </div>
-    <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:12px;color:${C.muted}">New loan balance</span>
-      <span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${C.green}">${fA(newBal)}</span>
-    </div>`;
-
-  return`<div>
-${reminderBanner()}
-<div style="margin-bottom:18px">
-  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px">📅 Log a Payment</h2>
-  <p style="font-size:12px;color:${C.muted};margin:0">Enter what you paid — the dashboard works out the rest.</p>
-</div>
-<div style="background:linear-gradient(135deg,rgba(56,189,248,.07),rgba(192,132,252,.03));border:1px solid rgba(56,189,248,.2);border-radius:18px;padding:22px;margin-bottom:24px">
-  <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-    <div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:16px">
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Month</label>
-          <input id="h-month" type="month" value="${nowYM()}" style="${INP}"></div>
-        <div>
-          <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">How much did you pay? ($)</label>
-          <input id="h-paid" value="${minPmt}" style="${INP}">
-          <div style="font-size:10px;color:${C.muted};margin-top:4px">Minimum is ${fA(minPmt)} — just enter whatever you paid</div>
-        </div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Offset balance ($)</label>
-          <input id="h-off" value="${Math.round(lastOff)}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Note <span style="font-weight:400">optional</span></label>
-          <input id="h-note" placeholder="e.g. Rate dropped" style="${INP}"></div>
-      </div>
-      <div style="margin-bottom:16px">
-        <button id="h-rate-toggle" style="background:none;border:none;padding:0;color:${C.blue};font-size:12px;cursor:pointer;font-family:'Mulish',sans-serif;display:flex;align-items:center;gap:5px">
-          <span id="h-rate-arrow">▶</span> Rate or repayment changed this month?
-        </button>
-        <div id="h-rate-panel" style="display:none;margin-top:12px;padding:14px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:10px">
-          <div style="font-size:12px;color:${C.amber};font-weight:600;margin-bottom:10px">Update rate &amp; repayment</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">New interest rate (% p.a.)</label>
-              <input id="h-rate" type="number" step="0.01" value="${rate}" style="${INP}"></div>
-            <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">New minimum repayment ($)</label>
-              <input id="h-newpmt" value="${minPmt}" style="${INP}"></div>
-          </div>
-          <p style="font-size:11px;color:${C.muted};margin:8px 0 0;line-height:1.5">These will update your loan settings and all future projections.</p>
-        </div>
-      </div>
-      ${pbtn('✓ Record Payment','h-save',C.green)}
-      <p style="font-size:11px;color:${C.muted};margin-top:10px;margin-bottom:0">Based on last recorded balance of <strong style="color:${C.text}">${fA(lastBal)}</strong></p>
-    </div>
-    <div id="h-preview" style="background:rgba(0,0,0,.2);border-radius:12px;padding:16px">
-      ${previewHTML(init.int,init.principal,minPmt,0,init.newBal)}
-    </div>
-  </div>
-</div>
-${rows.length===0
-  ?`<div style="text-align:center;padding:30px 0;color:${C.muted};font-size:13px">No payments recorded yet — log your first one above ↑</div>`
-  :`<div class="surf" style="padding:0;overflow:hidden">
-    <div style="overflow-x:auto">
-      <table><thead><tr><th>Month</th><th>Balance</th><th>Offset</th><th>Effective</th><th>Change</th><th>Note</th><th></th></tr></thead>
-      <tbody>${tableRows}</tbody></table>
-    </div>
-    <div style="padding:10px 14px;font-size:11px;color:${C.muted}">${rows.length} entries · ↓ balance dropped (good) · newest first</div>
-  </div>`}
+  <p style="font-size:12px;color:${C.muted};margin:0 0 14px">Your actual progress vs projection</p>
+  ${svgChart(D.history,proj,proj)}
+</div>`:''}
 </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// TOOLS — everything else
+// ═══════════════════════════════════════════════════════════════════════
+function renderTools(){
+  const l=D.loan,bal=l.balance,off=l.offset,rate=l.rate||6.04,pmt=l.payment||5832;
+  const LUMP=[1000,2000,4000,8000,10000],LCOLS=['#fb923c','#fbbf24','#4ade80','#38bdf8','#c084fc'];
+  const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]};
 
-// ── REPAYMENTS ────────────────────────────────────────────────────────────────
-function renderExtra(){
-  const rows=[...D.repayments].sort((a,b)=>b.date.localeCompare(a.date));
+  // ── Suggestions ────────────────────────────────────────────────────────────
+  const wk50mo=Math.round(50*52/12),wk100mo=Math.round(100*52/12);
+  const sv=r=>({mo:isFinite(base.months)&&isFinite(r.months)?base.months-r.months:0,int:isFinite(base.totalInt)&&isFinite(r.totalInt)?base.totalInt-r.totalInt:0});
+  const SUGG=bal>0?[
+    {icon:'🔄',color:C.blue,title:'Switch to fortnightly payments',detail:`Pay ${fA(Math.round(pmt/2))} every fortnight — 26 payments/year means one free extra payment annually.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2,ppy:26}),act:{extra:0,fn:true,lump:0}},
+    {icon:'☕',color:C.orange,title:'Add $50 per week',detail:`${fA(wk50mo)}/month extra — small and sustainable.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk50mo,ppy:12}),act:{extra:wk50mo,fn:false,lump:0}},
+    {icon:'💪',color:C.green,title:'Add $100 per week',detail:`${fA(wk100mo)}/month extra — a meaningful commitment.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk100mo,ppy:12}),act:{extra:wk100mo,fn:false,lump:0}},
+    {icon:'🎁',color:C.amber,title:'Put your tax refund at it every year',detail:`$3,000 annual lump sum — zero change to monthly budget.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:3000}),act:{extra:0,fn:false,lump:3000}},
+    {icon:'🪣',color:C.purple,title:'Grow your offset by $10,000',detail:`Saves ${fA(10000*rate/100)} per year in interest — and it's still your money.`,r:amort({balance:bal,offset:off+10000,ratePA:rate,pmt,ppy:12}),act:null},
+    {icon:'🚀',color:C.green,title:'Go fortnightly AND add $50/week',detail:`Both strategies combined — the compound effect is greater than either alone.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2+wk50mo/2,ppy:26}),act:{extra:wk50mo,fn:true,lump:0}},
+  ]:[];
+  const suggCards=SUGG.map(s=>{
+    const{mo,int}=sv(s.r);
+    const badge=(txt,col)=>`<span style="padding:4px 10px;border-radius:6px;background:${col}20;color:${col};font-size:12px;font-weight:700;font-family:'DM Mono',monospace">${txt}</span>`;
+    return`<div style="background:rgba(255,255,255,.02);border:1px solid ${C.border};border-left:3px solid ${s.color};border-radius:14px;padding:18px;display:flex;align-items:flex-start;gap:14px">
+      <div style="font-size:24px;flex-shrink:0">${s.icon}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px;margin-bottom:4px">${s.title}</div>
+        <div style="font-size:12px;color:${C.muted};margin-bottom:10px;line-height:1.5">${s.detail}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          ${mo>0?badge('⏱ '+fY(mo)+' sooner',C.green):''}
+          ${int>0?badge('💰 Save '+fA(int),C.green):''}
+          ${s.act?`<button onclick="goToCalc(${s.act.extra},${s.act.fn},${s.act.lump})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:${C.muted};font-size:12px;cursor:pointer">Try in calculator →</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── Calculator state ────────────────────────────────────────────────────────
+  const CXe=window._CX||{extra:D.strategy.extraMonthly||0,lump:D.strategy.annualLump||0,fn:D.strategy.fortnightly||false,wf:0};
+  window._CX=CXe;
+  const cpmt=CXe.fn?(pmt+CXe.extra)/2:(pmt+CXe.extra),cppy=CXe.fn?26:12;
+  const cproj=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:cpmt,ppy:cppy,lump:CXe.lump}):{months:Infinity,totalInt:Infinity};
+  const cmoS=isFinite(base.months)&&isFinite(cproj.months)?base.months-cproj.months:0;
+  const cintS=isFinite(base.totalInt)&&isFinite(cproj.totalInt)?base.totalInt-cproj.totalInt:0;
+  const lumpRows=LUMP.map((ls,i)=>{const r=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:ls}):{months:Infinity,totalInt:Infinity};return`<tr><td style="font-family:'DM Mono',monospace;font-weight:700;color:${LCOLS[i]}">${fA(ls)}</td><td style="font-family:'DM Mono',monospace">${fD(r.months)}</td><td style="font-weight:600">${fY(r.months)}</td><td style="font-family:'DM Mono',monospace;color:${C.green};font-weight:700">${isFinite(base.months)&&isFinite(r.months)?fY(base.months-r.months):'—'}</td><td style="font-family:'DM Mono',monospace;color:${C.green};font-weight:700">${isFinite(base.totalInt)&&isFinite(r.totalInt)?fA(base.totalInt-r.totalInt):'—'}</td></tr>`;}).join('');
+
+  // ── History table ───────────────────────────────────────────────────────────
+  const hrows=[...D.history].sort((a,b)=>b.month.localeCompare(a.month));
+  const histTable=hrows.length===0?`<p style="color:${C.muted};font-size:13px;padding:20px 0">No payments logged yet — use the Dashboard to record them.</p>`
+    :`<div style="overflow-x:auto"><table><thead><tr><th>Month</th><th>Balance</th><th>Offset</th><th>Change</th><th>Note</th><th></th></tr></thead><tbody>
+    ${hrows.map((h,i)=>{const nx=hrows[i+1],ch=nx?h.balance-nx.balance:null;const chStr=ch!=null?`<span style="font-family:'DM Mono',monospace;color:${ch>0?C.green:C.red};font-weight:600">${ch>0?'↓':ch<0?'↑':'–'}${ch!==0?' '+fA(Math.abs(ch)):''}</span>`:'';return`<tr><td><span style="font-family:'DM Mono',monospace;font-weight:600">${fMo(h.month)}</span></td><td style="font-family:'DM Mono',monospace">${fA2(h.balance)}</td><td style="font-family:'DM Mono',monospace;color:${C.green}">${fA(h.offset)}</td><td>${chStr}</td><td style="color:${C.muted};font-size:12px">${esc(h.note)||'—'}</td><td><button onclick="delHistory('${h.id}')" style="background:none;border:none;color:${C.muted};font-size:14px;padding:2px 6px;cursor:pointer">✕</button></td></tr>`;}).join('')}
+    </tbody></table></div><div style="font-size:11px;color:${C.muted};padding:8px 0">${hrows.length} entries · ↓ = balance dropped</div>`;
+
+  // ── Extra payments table ────────────────────────────────────────────────────
+  const erows=[...D.repayments].sort((a,b)=>b.date.localeCompare(a.date));
   const total=D.repayments.reduce((s,r)=>s+r.amount,0);
   const TC={offset:C.blue,principal:C.green,lump:C.amber,windfall:C.purple};
   const TL={offset:'Offset',principal:'Repayment',lump:'Lump Sum',windfall:'Windfall'};
-  const tableRows=rows.map(r=>`<tr>
-    <td style="font-family:'DM Mono',monospace">${new Date(r.date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</td>
-    <td style="font-family:'DM Mono',monospace;font-weight:700;color:${C.green}">${fA(r.amount)}</td>
-    <td><span class="tag" style="background:${(TC[r.type]||C.muted)}20;color:${TC[r.type]||C.muted}">${TL[r.type]||r.type}</span></td>
-    <td style="color:${C.muted}">${esc(r.description)||'—'}</td>
-    <td><button onclick="delRepayment('${r.id}')" style="background:none;border:none;color:${C.muted};font-size:14px;padding:2px 6px;cursor:pointer">✕</button></td>
-  </tr>`).join('');
+  const extraTable=erows.length===0?`<p style="color:${C.muted};font-size:13px;padding:20px 0">No extra payments logged yet.</p>`
+    :`<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Description</th><th></th></tr></thead><tbody>
+    ${erows.map(r=>`<tr><td style="font-family:'DM Mono',monospace">${new Date(r.date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</td><td style="font-family:'DM Mono',monospace;font-weight:700;color:${C.green}">${fA(r.amount)}</td><td><span class="tag" style="background:${(TC[r.type]||C.muted)}20;color:${TC[r.type]||C.muted}">${TL[r.type]||r.type}</span></td><td style="color:${C.muted}">${esc(r.description)||'—'}</td><td><button onclick="delRepayment('${r.id}')" style="background:none;border:none;color:${C.muted};font-size:14px;padding:2px 6px;cursor:pointer">✕</button></td></tr>`).join('')}
+    </tbody></table></div>${total>0?`<div style="font-size:13px;color:${C.green};font-family:'DM Mono',monospace;font-weight:700;padding-top:8px">${fA(total)} total extra logged</div>`:''}`;
 
-  return`<div>
-<div style="margin-bottom:18px">
-  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px">➕ Extra Payments</h2>
-  <p style="font-size:12px;color:${C.muted};margin:0">For <strong style="color:${C.text}">separate</strong> transfers beyond your regular payment — tax refunds, bonuses, lump sums, windfalls. <span style="color:${C.blue}">Your regular monthly payment? Log that in 📅 History.</span></p>
-</div>
-${total>0?`<div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
-  ${stat('Total Extra Paid',fA(total),`${rows.length} payments`,C.green)}
-  ${stat('Approx Annual Saving',`${fA(total*D.loan.rate/100)}/yr`,'if held in offset',C.amber)}
-</div>`:''}
-<div style="background:linear-gradient(135deg,rgba(0,214,143,.07),rgba(56,189,248,.03));border:1px solid rgba(0,214,143,.2);border-radius:18px;padding:22px;margin-bottom:22px">
-  <div style="font-size:13px;font-weight:700;color:${C.green};margin-bottom:16px">Log a Payment</div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:14px">
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Date</label>
-      <input id="e-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Amount ($)</label>
-      <input id="e-amt" placeholder="e.g. 5000" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Type</label>
-      <select id="e-type" style="${INP}">
-        <option value="offset">Added to Offset</option>
-        <option value="principal">Extra Repayment</option>
-        <option value="lump">Annual Lump Sum</option>
-        <option value="windfall">Windfall</option>
-      </select></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Description</label>
-      <input id="e-desc" placeholder="e.g. Tax refund, bonus" style="${INP}"></div>
-  </div>
-  ${pbtn('✓ Log Payment','e-save',C.green)}
-</div>
-${rows.length===0
-  ?`<div style="text-align:center;padding:40px 0;color:${C.muted};font-size:13px">No extra payments logged yet — every dollar counts!</div>`
-  :`<div class="surf" style="padding:0;overflow:hidden">
-    <div style="overflow-x:auto"><table>
-      <thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Description</th><th></th></tr></thead>
-      <tbody>${tableRows}
-        <tr><td colspan="5" style="font-family:'DM Mono',monospace;font-weight:700;color:${C.green};border-bottom:none">${fA(total)} total logged</td></tr>
-      </tbody></table></div>
-  </div>`}
-</div>`;
-}
-
-// ── CALCULATOR ────────────────────────────────────────────────────────────────
-let CX={extra:0,lump:0,fn:false,wf:0};
-function calcResults(){
-  const latest=D.history.length>0?D.history[D.history.length-1]:D.loan;
-  const{balance:bal,offset:off,rate}=latest;
-  const pmt=CX.fn?(D.loan.payment+CX.extra)/2:(D.loan.payment+CX.extra),ppy=CX.fn?26:12;
-  const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:D.loan.payment||5832,ppy:12}):{months:Infinity,totalInt:Infinity};
-  const proj=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy,lump:CX.lump}):{months:Infinity,totalInt:Infinity};
-  const wfR=CX.wf>0&&bal>0?amort({balance:Math.max(0,bal-CX.wf),offset:off,ratePA:rate,pmt,ppy,lump:CX.lump}):null;
-  const moS=isFinite(base.months)&&isFinite(proj.months)?base.months-proj.months:0;
-  const intS=isFinite(base.totalInt)&&isFinite(proj.totalInt)?base.totalInt-proj.totalInt:0;
-  return{base,proj,wfR,moS,intS,bal,off,rate,ppy,pmt};
-}
-
-function updateCalcDisplay(){
-  const{proj,wfR,moS,intS}=calcResults();
-  const el=document.getElementById('calc-res');
-  if(!el)return;
-  el.innerHTML=`
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;background:rgba(0,0,0,.25);border-radius:14px;padding:16px;margin-bottom:14px">
-      ${[['Pays off',fD(proj.months),C.text],['Time left',fY(proj.months),C.text],['Sooner',moS>1?fY(moS)+' sooner':'—',C.green],['Int. saved',intS>100?fA(intS):'—',C.green]].map(([l,v,c])=>`
-        <div style="text-align:center">
-          <div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${l}</div>
-          <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${c}">${v}</div>
-        </div>`).join('')}
-    </div>`;
-  if(CX.wf>0&&wfR){
-    const wfMo=calcResults().base&&isFinite(calcResults().base.months)&&isFinite(wfR.months)?calcResults().base.months-wfR.months:0;
-    const wfInt=calcResults().base&&isFinite(calcResults().base.totalInt)&&isFinite(wfR.totalInt)?calcResults().base.totalInt-wfR.totalInt:0;
-    const per1k=CX.wf>=1000&&wfInt>0?wfInt/(CX.wf/1000):0;
-    const wfEl=document.getElementById('wf-res');
-    if(wfEl)wfEl.innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;background:rgba(0,0,0,.25);border-radius:12px;padding:14px;margin-bottom:12px">
-        ${[['New payoff',fD(wfR.months)],['Time left',fY(wfR.months)],['Time saved',wfMo>0?fY(wfMo):'—'],['Int. saved',wfInt>0?fA(wfInt):'—']].map(([l,v])=>`
-          <div style="text-align:center">
-            <div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${l}</div>
-            <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:${C.green}">${v}</div>
-          </div>`).join('')}
-      </div>
-      ${per1k>0?`<div style="background:rgba(250,204,21,.07);border-radius:10px;padding:12px 14px;font-size:13px;color:#fef08a">
-        💡 Every <strong>$1,000</strong> applied today saves ~<strong>${fA(per1k)}</strong> in total interest.
-        ${wfInt>CX.wf?`<span style="color:${C.green}"> That's a <strong>${(wfInt/CX.wf).toFixed(1)}x</strong> return.</span>`:''}
-      </div>`:''}`;
-  }
-}
-
-function renderCalc(){
-  const latest=D.history.length>0?D.history[D.history.length-1]:D.loan;
-  const{balance:bal,offset:off,rate}=latest;
-  CX.extra=D.strategy.extraMonthly||0;
-  CX.lump=D.strategy.annualLump||0;
-  CX.fn=D.strategy.fortnightly||false;
-  CX.wf=0;
-  const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:D.loan.payment||5832,ppy:12}):{months:Infinity,totalInt:Infinity};
-  const LUMP=[1000,2000,4000,8000,10000],LCOLS=['#fb923c','#fbbf24','#4ade80','#38bdf8','#c084fc'];
-  const lumpRows=LUMP.map((ls,i)=>{
-    const r=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:D.loan.payment||5832,ppy:12,lump:ls}):{months:Infinity,totalInt:Infinity};
-    return`<tr><td style="font-family:'DM Mono',monospace;font-weight:700;color:${LCOLS[i]}">${fA(ls)}</td>
-      <td style="font-family:'DM Mono',monospace">${fD(r.months)}</td>
-      <td style="font-weight:600">${fY(r.months)}</td>
-      <td style="font-family:'DM Mono',monospace;color:${C.green};font-weight:700">${isFinite(base.months)&&isFinite(r.months)?fY(base.months-r.months):'—'}</td>
-      <td style="font-family:'DM Mono',monospace;color:${C.green};font-weight:700">${isFinite(base.totalInt)&&isFinite(r.totalInt)?fA(base.totalInt-r.totalInt):'—'}</td></tr>`;
-  }).join('');
-
-  return`<div>
-<div style="margin-bottom:18px">
-  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px">🧮 Scenario Calculator</h2>
-  <p style="font-size:12px;color:${C.muted};margin:0">Adjust your strategy and see the impact. Save to update dashboard projections.</p>
-</div>
-<div style="background:linear-gradient(135deg,rgba(56,189,248,.07),rgba(192,132,252,.04));border:1px solid rgba(56,189,248,.2);border-radius:18px;padding:22px;margin-bottom:20px">
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:20px;margin-bottom:18px">
-    <div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:12px;color:#94a3b8">Extra / month</span>
-        <span id="c-extra-lbl" style="font-family:'DM Mono',monospace;font-weight:700;color:${C.blue};font-size:13px">${fA(CX.extra)}</span>
-      </div>
-      <input id="c-extra" type="range" min="0" max="2000" step="50" value="${CX.extra}" style="width:100%;accent-color:${C.blue}">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:3px"><span>$0</span><span>$1,000</span><span>$2,000</span></div>
+  const section=(icon,title,content)=>`<div style="margin-bottom:32px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid ${C.border}">
+      <span style="font-size:18px">${icon}</span>
+      <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0">${title}</h2>
     </div>
-    <div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:12px;color:#94a3b8">Annual lump sum</span>
-        <span id="c-lump-lbl" style="font-family:'DM Mono',monospace;font-weight:700;color:${C.amber};font-size:13px">${fA(CX.lump)}</span>
-      </div>
-      <input id="c-lump" type="range" min="0" max="15000" step="500" value="${CX.lump}" style="width:100%;accent-color:${C.amber}">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:3px"><span>$0</span><span>$7.5K</span><span>$15K</span></div>
-    </div>
-  </div>
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap">
-    <button id="c-fn" style="padding:9px 18px;border-radius:50px;border:none;background:${CX.fn?C.blue:'rgba(255,255,255,.09)'};color:${CX.fn?'#07090f':'#94a3b8'};font-weight:700;font-size:13px">${CX.fn?'✓ Fortnightly ON':'Switch to Fortnightly?'}</button>
-    <span id="c-yr-lbl" style="font-size:12px;color:${C.muted}">${fA(CX.fn?(D.loan.payment+CX.extra)/2*26:(D.loan.payment+CX.extra)*12)}/yr</span>
-  </div>
-  <div id="calc-res"></div>
-  ${pbtn('💾 Save as My Strategy','c-save',C.green)}
-  <span style="font-size:11px;color:${C.muted};margin-left:12px">Updates dashboard projections</span>
-</div>
-<div style="background:linear-gradient(135deg,rgba(250,204,21,.08),rgba(251,146,60,.04));border:1px solid rgba(250,204,21,.25);border-radius:18px;padding:22px;margin-bottom:20px">
-  <div style="font-size:15px;font-family:'Syne',sans-serif;font-weight:700;color:${C.amber};margin-bottom:6px">⭐ Windfall Calculator</div>
-  <p style="font-size:12px;color:${C.muted};margin:0 0 16px">Inheritance, bonus, car sale — enter any amount and see what applying it today would do.</p>
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-    <div style="display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.3);border:1px solid ${C.amber}40;border-radius:10px;padding:8px 14px">
-      <span style="font-family:'DM Mono',monospace;color:${C.muted}">$</span>
-      <input id="wf-txt" type="text" inputmode="numeric" placeholder="e.g. 50000" style="background:transparent;border:none;font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${C.amber};width:130px;outline:none">
-    </div>
-    <input id="wf-range" type="range" min="0" max="200000" step="5000" value="0" style="flex:1;min-width:100px;accent-color:${C.amber}">
-    <button id="wf-clear" style="padding:5px 10px;border-radius:6px;border:1px solid ${C.border};background:transparent;color:${C.muted};font-size:12px;display:none">✕</button>
-  </div>
-  <div id="wf-res"></div>
-</div>
-<div class="surf" style="padding:0;overflow:hidden">
-  <div style="padding:16px 18px 8px">
-    <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:3px">🎁 Annual Lump Sum Reference</div>
-    <p style="font-size:12px;color:${C.muted};margin:0">Impact of throwing a fixed amount at the loan every year</p>
-  </div>
-  <div style="overflow-x:auto"><table>
-    <thead><tr><th>Per Year</th><th>Pays Off</th><th>Duration</th><th>Months Saved</th><th>Int. Saved</th></tr></thead>
-    <tbody>${lumpRows}</tbody>
-  </table></div>
-</div></div>`;
-}
-
-// ── SETTINGS ──────────────────────────────────────────────────────────────────
-function renderSett(){
-  const l=D.loan;
-  return`<div>
-<div style="margin-bottom:18px">
-  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px">⚙️ Settings</h2>
-  <p style="font-size:12px;color:${C.muted};margin:0">Update your loan details. These feed into all projections and the dashboard.</p>
-</div>
-<div class="surf" style="margin-bottom:20px">
-  <div style="font-size:13px;font-weight:700;margin-bottom:16px">Loan Details</div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px">
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Loan Balance ($)</label><input id="s-bal" value="${l.balance?Math.round(l.balance*100)/100:''}" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Current Offset Balance ($)</label><input id="s-off" value="${l.offset?Math.round(l.offset*100)/100:''}" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Interest Rate (% p.a.)</label><input id="s-rate" value="${l.rate||''}" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Monthly Repayment ($)</label><input id="s-pmt" value="${l.payment||''}" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original Loan Amount ($)</label><input id="s-orig" value="${l.origBalance||''}" style="${INP}"></div>
-    <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label><input id="s-end" value="${l.origEnd||''}" style="${INP}"></div>
-  </div>
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    ${pbtn('💾 Save Loan Details','s-save',C.blue)}
-    <span id="s-msg" style="font-size:12px;font-family:'DM Mono',monospace;color:${C.green}"></span>
-  </div>
-</div>
-<div class="surf">
-  <div style="font-size:13px;font-weight:700;margin-bottom:6px">Data Management</div>
-  <p style="font-size:12px;color:${C.muted};margin:0 0 18px;line-height:1.6">Data lives in this browser's localStorage. Export regularly as a backup. Use Import to restore or move to a new device.</p>
-  <div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
-    ${pbtn('⬇ Export Backup','s-export',C.green)}
-    ${pbtn('⬆ Import Backup','s-import',C.blue)}
-    ${gbtn('🗑 Reset All Data','s-reset',C.red)}
-  </div>
-  <div style="padding:14px 16px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.15);border-radius:12px;font-size:12px;color:#bae6fd;line-height:1.7">
-    <strong>Live URL:</strong>
-    <a href="https://litestep23.github.io/mortgage-dashboard/" target="_blank" style="color:${C.blue};margin-left:6px">litestep23.github.io/mortgage-dashboard</a><br>
-    Bookmark this on your main device. Export backup if you need to switch browsers or devices.
-  </div>
-</div></div>`;
-}
-
-// ── EVENT ATTACHMENT ──────────────────────────────────────────────────────────
-// ── SUGGESTIONS ──────────────────────────────────────────────────────────────
-function renderSugg(){
-  const l=D.loan,bal=l.balance,off=l.offset,rate=l.rate||6.04,pmt=l.payment||5832;
-  if(!bal)return`<div style="text-align:center;padding:60px 20px;color:${C.muted};font-size:13px">
-    Enter your loan details in Overview first to see personalised suggestions.
+    ${content}
   </div>`;
 
-  const base=amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12});
-  const sv=(r)=>({
-    mo:isFinite(base.months)&&isFinite(r.months)?base.months-r.months:0,
-    int:isFinite(base.totalInt)&&isFinite(r.totalInt)?base.totalInt-r.totalInt:0
-  });
+  return`<div>
 
-  // Weekly amounts as monthly equivalents: $/wk × 52 ÷ 12
-  const wk50mo  = Math.round(50*52/12);   // $217/mo
-  const wk100mo = Math.round(100*52/12);  // $433/mo
+  ${section('💡','Suggestions',suggCards||`<p style="color:${C.muted};font-size:13px">Enter your loan details in Settings to see personalised suggestions.</p>`)}
 
-  const SUGG=[
-    {
-      icon:'🔄', color:C.blue,
-      title:'Switch to fortnightly payments',
-      detail:`Pay ${fA(Math.round(pmt/2))} every fortnight instead of ${fA(pmt)} monthly. You make 26 payments a year — that's one full extra payment annually with zero extra effort.`,
-      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2,ppy:26}),
-      act:{extra:0,fn:true,lump:0}
-    },
-    {
-      icon:'☕', color:C.orange,
-      title:'Add $50 per week',
-      detail:`${fA(wk50mo)}/month extra — roughly the cost of a few coffees a week. Small and sustainable, but the compounding impact over 20+ years is significant.`,
-      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk50mo,ppy:12}),
-      act:{extra:wk50mo,fn:false,lump:0}
-    },
-    {
-      icon:'💪', color:C.green,
-      title:'Add $100 per week',
-      detail:`${fA(wk100mo)}/month extra. A meaningful commitment that seriously dents the loan — and every dollar goes straight to principal since interest is already covered.`,
-      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk100mo,ppy:12}),
-      act:{extra:wk100mo,fn:false,lump:0}
-    },
-    {
-      icon:'🎁', color:C.amber,
-      title:'Throw your tax refund at it every year',
-      detail:`A $3,000 annual lump sum — the average Australian tax refund — applied directly each year. No change to your monthly budget, just redirecting money you already get back.`,
-      r:amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:3000}),
-      act:{extra:0,fn:false,lump:3000}
-    },
-    {
-      icon:'🪣', color:C.purple,
-      title:'Grow your offset by $10,000',
-      detail:`A one-time top-up of $10,000 into your offset saves ${fA(10000*rate/100)} per year in interest — every single year — and you keep the money. It's always there if you need it.`,
-      r:amort({balance:bal,offset:off+10000,ratePA:rate,pmt,ppy:12}),
-      act:null
-    },
-    {
-      icon:'🚀', color:C.green,
-      title:'Go fortnightly AND add $50/week',
-      detail:`Combine both strategies: fortnightly payments (${fA(Math.round(pmt/2+wk50mo/2))}/fn) plus the weekly extra. The compound effect of both together is greater than either alone.`,
-      r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2+wk50mo/2,ppy:26}),
-      act:{extra:wk50mo,fn:true,lump:0}
-    },
-  ];
-
-  const cards=SUGG.map(s=>{
-    const{mo,int}=sv(s.r);
-    const badge=(txt,col)=>`<span style="padding:4px 10px;border-radius:6px;background:${col}20;color:${col};font-size:12px;font-weight:700;font-family:'DM Mono',monospace">${txt}</span>`;
-    const calcBtn=s.act?`<button onclick="goToCalc(${s.act.extra},${s.act.fn},${s.act.lump})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:${C.muted};font-size:12px;cursor:pointer">Try in Calculator →</button>`:'';
-    return`<div style="background:rgba(255,255,255,.02);border:1px solid ${C.border};border-left:3px solid ${s.color};border-radius:14px;padding:20px">
-      <div style="display:flex;align-items:flex-start;gap:14px">
-        <div style="font-size:26px;flex-shrink:0;margin-top:2px">${s.icon}</div>
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:15px;margin-bottom:5px">${s.title}</div>
-          <div style="font-size:13px;color:${C.muted};margin-bottom:12px;line-height:1.6">${s.detail}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            ${mo>0?badge('⏱ '+fY(mo)+' sooner',C.green):''}
-            ${int>0?badge('💰 Save '+fA(int),C.green):''}
-            ${calcBtn}
-          </div>
+  ${section('🧮','Scenarios & Calculator',`
+    <div style="background:linear-gradient(135deg,rgba(56,189,248,.07),rgba(192,132,252,.04));border:1px solid rgba(56,189,248,.2);border-radius:18px;padding:20px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-bottom:16px">
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:#94a3b8">Extra / month</span><span id="c-extra-lbl" style="font-family:'DM Mono',monospace;font-weight:700;color:${C.blue};font-size:13px">${fA(CXe.extra)}</span></div>
+          <input id="c-extra" type="range" min="0" max="2000" step="50" value="${CXe.extra}" style="width:100%;accent-color:${C.blue}">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:3px"><span>$0</span><span>$1,000</span><span>$2,000</span></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:#94a3b8">Annual lump sum</span><span id="c-lump-lbl" style="font-family:'DM Mono',monospace;font-weight:700;color:${C.amber};font-size:13px">${fA(CXe.lump)}</span></div>
+          <input id="c-lump" type="range" min="0" max="15000" step="500" value="${CXe.lump}" style="width:100%;accent-color:${C.amber}">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:3px"><span>$0</span><span>$7.5K</span><span>$15K</span></div>
         </div>
       </div>
-    </div>`;
-  }).join('');
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <button id="c-fn" style="padding:8px 18px;border-radius:50px;border:none;background:${CXe.fn?C.blue:'rgba(255,255,255,.09)'};color:${CXe.fn?'#07090f':'#94a3b8'};font-weight:700;font-size:13px">${CXe.fn?'✓ Fortnightly ON':'Switch to Fortnightly?'}</button>
+      </div>
+      <div id="calc-res" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;background:rgba(0,0,0,.2);border-radius:12px;padding:14px">
+        ${[['Pays off',fD(cproj.months)],['Time left',fY(cproj.months)],['Sooner',cmoS>1?fY(cmoS)+' sooner':'—'],['Int. saved',cintS>100?fA(cintS):'—']].map(([l,v])=>`<div style="text-align:center"><div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${l}</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:${C.green}">${v}</div></div>`).join('')}
+      </div>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        ${pbtn('💾 Save as My Strategy','c-save',C.green)}
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px 16px 8px"><div style="font-weight:600;font-size:14px;margin-bottom:2px">Annual Lump Sum Reference</div><p style="font-size:12px;color:${C.muted};margin:0">What a yearly lump sum does to your loan</p></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Per Year</th><th>Pays Off</th><th>Duration</th><th>Time Saved</th><th>Int. Saved</th></tr></thead><tbody>${lumpRows}</tbody></table></div>
+    </div>
+  `)}
 
-  return`<div>
-<div style="margin-bottom:20px">
-  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:8px">💡 Personalised Suggestions</h2>
-  <p style="font-size:13px;color:${C.muted};margin:0;line-height:1.6">Based on your current loan of ${fA(bal)} at ${rate}% — every figure below is calculated against your actual numbers.</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:12px">${cards}</div>
-<div style="margin-top:20px;padding:14px 16px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.15);border-radius:12px;font-size:12px;color:#bae6fd;line-height:1.7">
-  💡 All comparisons are against your current baseline: ${fA(pmt)}/month with ${fA(off)} in offset, projected to pay off ${fD(base.months)}.
-</div>
+  ${section('➕','Extra Payments',`
+    <div style="background:linear-gradient(135deg,rgba(0,214,143,.07),rgba(56,189,248,.03));border:1px solid rgba(0,214,143,.2);border-radius:18px;padding:20px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:${C.green};margin-bottom:14px">Log a separate extra payment</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Date</label><input id="e-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Amount ($)</label><input id="e-amt" placeholder="e.g. 5000" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Type</label><select id="e-type" style="${INP}"><option value="offset">Added to Offset</option><option value="principal">Extra Repayment</option><option value="lump">Annual Lump Sum</option><option value="windfall">Windfall</option></select></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Description</label><input id="e-desc" placeholder="e.g. Tax refund" style="${INP}"></div>
+      </div>
+      ${pbtn('✓ Log Extra Payment','e-save',C.green)}
+      <p style="font-size:11px;color:${C.muted};margin-top:10px;margin-bottom:0">Use this for separate transfers — tax refunds, bonuses, lump sums. Your regular payment (even if rounded up) is logged in the Dashboard.</p>
+    </div>
+    ${extraTable}
+  `)}
+
+  ${section('📅','Payment History',histTable)}
+
+  ${section('⚙️','Settings',`
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px">Loan Details</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px">
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Loan Balance ($)</label><input id="s-bal" value="${l.balance?Math.round(l.balance*100)/100:''}" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Offset Balance ($)</label><input id="s-off" value="${l.offset?Math.round(l.offset*100)/100:''}" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Interest Rate (% p.a.)</label><input id="s-rate" value="${l.rate||''}" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Monthly Repayment ($)</label><input id="s-pmt" value="${l.payment||''}" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original Loan Amount ($)</label><input id="s-orig" value="${l.origBalance||''}" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label><input id="s-end" value="${l.origEnd||''}" style="${INP}"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        ${pbtn('💾 Save Loan Details','s-save',C.blue)}
+        <span id="s-msg" style="font-size:12px;color:${C.green};font-family:'DM Mono',monospace"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">Data</div>
+      <p style="font-size:12px;color:${C.muted};margin:0 0 14px;line-height:1.6">Data lives in this browser. Export regularly as a backup.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${pbtn('⬇ Export Backup','s-export',C.green)}
+        ${pbtn('⬆ Import','s-import',C.blue)}
+        <button id="s-reset" style="padding:10px 18px;border-radius:8px;border:1px solid ${C.red}40;background:rgba(248,113,113,.1);color:${C.red};font-weight:700;font-size:14px">🗑 Reset</button>
+      </div>
+    </div>
+  `)}
+
 </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════════════════════════
+window.delHistory=id=>{D.history=D.history.filter(h=>h.id!==id);saveData();renderApp();};
+window.delRepayment=id=>{D.repayments=D.repayments.filter(r=>r.id!==id);saveData();renderApp();};
+window.markTransferred=id=>{const e=D.history.find(h=>h.id===id);if(e)e.extraTransferred=true;saveData();renderApp();};
+window.goToCalc=(extra,fn,lump)=>{if(!window._CX)window._CX={};window._CX.extra=extra;window._CX.fn=!!fn;window._CX.lump=lump;setTab('tools');};
+
+let TAB='dash';
+function setTab(id){TAB=id;renderApp();}
+
+// ═══════════════════════════════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════════════════════════════
 function attachEvents(){
-  // Dashboard loan details save
-  document.getElementById('d-save')?.addEventListener('click',()=>{
-    const pn=id=>parseFloat((document.getElementById(id)?.value||'').replace(/[^0-9.]/g,''))||0;
-    const b=pn('d-bal'),o=pn('d-off'),r=parseFloat(document.getElementById('d-rate')?.value)||6.04;
-    D.loan.balance=b; D.loan.offset=o; D.loan.rate=r;
-    D.loan.payment=pn('d-pmt'); D.loan.origBalance=pn('d-orig');
-    D.loan.origEnd=document.getElementById('d-end')?.value||'2051-09';
-    // Auto-add/update this month's history entry
-    const m=nowYM(),entry={id:gid(),month:m,balance:b,offset:o,rate:r,note:''};
-    const idx=D.history.findIndex(h=>h.month===m);
-    if(idx>=0){D.history[idx].balance=b;D.history[idx].offset=o;D.history[idx].rate=r;}
-    else D.history=[...D.history,entry].sort((a,b_)=>a.month.localeCompare(b_.month));
-    saveData(); renderApp();
-  });
-  // Dashboard nav buttons
-  document.getElementById('go-track')?.addEventListener('click',()=>setTab('track'));
-  document.getElementById('go-extra')?.addEventListener('click',()=>setTab('extra'));
-
-  // Slider reset buttons — snap back to baseline and fire the input handler
-  document.getElementById('d-pmt-reset')?.addEventListener('click',()=>{
-    const v=D.loan.payment||5832;
-    const s=document.getElementById('d-pmt-slider');
-    const inp=document.getElementById('d-pmt-input');
-    if(s) s.value=v;
-    if(inp) inp.value=v.toLocaleString('en-AU');
-    applyPmtValue(v);
-  });
-  document.getElementById('d-off-reset')?.addEventListener('click',()=>{
-    const v=D.loan.offset||0;
-    const s=document.getElementById('d-off-slider');
-    const inp=document.getElementById('d-off-input');
-    if(s) s.value=Math.round(v/5000)*5000;
-    if(inp) inp.value=Math.round(v).toLocaleString('en-AU');
-    applyOffValue(v);
-  });
-
-  // Offset explorer — shared updater
-  function applyOffValue(newOff, fromInput=false) {
-    const baseOff=D.loan.offset||0, diff=newOff-baseOff;
-    const inp=document.getElementById('d-off-input'), dlbl=document.getElementById('d-off-diff');
-    const slider=document.getElementById('d-off-slider');
-    if(inp && !fromInput){ inp.value=Math.round(newOff).toLocaleString('en-AU'); inp.style.color=diff<0?C.red:C.green; }
-    if(inp && fromInput)  { inp.style.color=diff<0?C.red:C.green; }
-    if(slider && !fromInput) slider.value=Math.min(Math.max(newOff,0),300000);
-    if(dlbl){dlbl.textContent=diff===0?'current':diff>0?`+${fA(diff)}`:fA(diff);dlbl.style.color=diff>0?C.green:diff<0?C.red:C.muted;}
-    const l=D.loan, r=l.rate||6.04, p=l.payment||5832;
-    const baseP=l.balance>0?amort({balance:l.balance,offset:baseOff,ratePA:r,pmt:p,ppy:12}):{months:Infinity,totalInt:Infinity};
-    const newP =l.balance>0?amort({balance:l.balance,offset:newOff, ratePA:r,pmt:p,ppy:12}):{months:Infinity,totalInt:Infinity};
-    const mSav=isFinite(baseP.months)&&isFinite(newP.months)?baseP.months-newP.months:0;
-    const iSav=isFinite(baseP.totalInt)&&isFinite(newP.totalInt)?baseP.totalInt-newP.totalInt:0;
-    const el=document.getElementById('d-off-results');
-    if(el)el.innerHTML=`
-      ${kv('Daily interest saved',fA(newOff*r/100/365)+'/day',C.green)}
-      ${kv('Monthly interest saved',fA(newOff*r/100/12)+'/mo',C.green)}
-      ${kv('Annual interest saved',fA(newOff*r/100)+'/yr',C.green)}
-      ${kv(diff===0?'Payoff impact':diff>0?'Sooner than now':'Later than now',
-           mSav===0?'Current baseline':mSav>0?fY(mSav)+' sooner':fY(Math.abs(mSav))+' longer',
-           mSav>0?C.green:mSav<0?C.red:C.muted)}
-      ${iSav>0?kv('Total interest saved',fA(iSav)+' less',C.green):''}
-    `;
-  }
-  // Offset explorer slider
-  document.getElementById('d-off-slider')?.addEventListener('input',function(){ applyOffValue(+this.value); });
-  // Manual text input
-  document.getElementById('d-off-input')?.addEventListener('input',function(){
-    const raw=this.value.replace(/[^0-9]/g,'');
-    if(!raw)return;
-    applyOffValue(+raw, true);
-  });
-  document.getElementById('d-off-input')?.addEventListener('blur',function(){
-    const raw=this.value.replace(/[^0-9]/g,'');
-    const v=Math.min(Math.max(+(raw||D.loan.offset||0),0),300000);
-    this.value=Math.round(v).toLocaleString('en-AU');
-    applyOffValue(v, true);
-  });
-
-  // Repayment explorer slider — live projection updates without re-render
-  // Shared repayment projection updater
-  function applyPmtValue(pmt, fromInput=false) {
-    const basePmt=D.loan.payment||5832, diff=pmt-basePmt;
-    const inp=document.getElementById('d-pmt-input'), dlbl=document.getElementById('d-pmt-diff');
-    const slider=document.getElementById('d-pmt-slider');
-    if(inp && !fromInput){ inp.value=pmt.toLocaleString('en-AU'); inp.style.color=diff>0?C.green:diff<0?C.red:C.blue; }
-    if(inp && fromInput)  { inp.style.color=diff>0?C.green:diff<0?C.red:C.blue; }
-    if(slider && !fromInput) slider.value=Math.min(Math.max(pmt,3000),12000);
-    if(dlbl){ dlbl.textContent=diff===0?'base':diff>0?`+${fA(diff)}/mo`:`${fA(diff)}/mo`; dlbl.style.color=diff>0?C.green:diff<0?C.red:C.muted; }
-    const l=D.loan; if(!l.balance)return;
-    const baseP=amort({balance:l.balance,offset:l.offset,ratePA:l.rate,pmt:basePmt,ppy:12});
-    const newP =amort({balance:l.balance,offset:l.offset,ratePA:l.rate,pmt,ppy:12});
-    const mSav=isFinite(baseP.months)&&isFinite(newP.months)?baseP.months-newP.months:0;
-    const iSav=isFinite(baseP.totalInt)&&isFinite(newP.totalInt)?baseP.totalInt-newP.totalInt:0;
-    const el=document.getElementById('d-proj-results');
-    if(el)el.innerHTML=`
-      ${kv('Pay off',fD(newP.months))}
-      ${kv('Time remaining',fY(newP.months))}
-      ${kv(diff===0?'At base repayment':diff>0?'Sooner than base':'Later than base', mSav===0?'Baseline':mSav>0?fY(mSav)+' sooner':fY(Math.abs(mSav))+' longer', mSav>0?C.green:mSav<0?C.red:C.muted)}
-      ${kv('Total interest',fA(newP.totalInt)+(iSav>0?` <span style="color:${C.green};font-size:11px">(save ${fA(iSav)})</span>`:''))}
-    `;
-  }
-  document.getElementById('d-pmt-slider')?.addEventListener('input',function(){ applyPmtValue(+this.value); });
-  // Manual text input — parse, clamp, sync slider
-  document.getElementById('d-pmt-input')?.addEventListener('input',function(){
-    const raw=this.value.replace(/[^0-9]/g,'');
-    if(!raw)return;
-    applyPmtValue(+raw, true);
-  });
-  document.getElementById('d-pmt-input')?.addEventListener('blur',function(){
-    const raw=this.value.replace(/[^0-9]/g,'');
-    const v=Math.min(Math.max(+(raw||D.loan.payment||5832),3000),12000);
-    this.value=v.toLocaleString('en-AU');
-    applyPmtValue(v, true);
-  });
-
-  // History save
-  // Live preview update for payment form
-  function updateHPreview(){
+  // ── Payment logger (Dashboard) ─────────────────────────────────────
+  function updatePaymentPreview(){
     const lastEntry=D.history.length>0?D.history[D.history.length-1]:D.loan;
     const lastBal=lastEntry.balance||D.loan.balance||0;
-    const off=parseFloat((document.getElementById('h-off')?.value||'').replace(/[^0-9.]/g,''))||lastEntry.offset||D.loan.offset||0;
+    const off=parseFloat((document.getElementById('h-off')?.value||'').replace(/[^0-9.]/g,''))||0;
     const paid=parseFloat((document.getElementById('h-paid')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment||5832;
-    const rate=D.loan.rate||6.04, minPmt=D.loan.payment||5832;
+    const rate=D.loan.rate||6.04,minPmt=D.loan.payment||5832;
     const int=Math.max(0,lastBal-off)*rate/100/12;
     const principal=Math.max(0,paid-int);
     const newBal=Math.round(Math.max(0,lastBal-principal)*100)/100;
     const extra=Math.max(0,paid-minPmt);
-    const el=document.getElementById('h-preview');
-    if(el)el.innerHTML=`
-      <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
-      ${kv('Starting balance',fA(lastBal))}
-      ${kv('Interest charged','− '+fA(int),C.red)}
-      ${kv('You paid','+ '+fA(paid),C.blue)}
-      <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
-        ${kv('Principal paid',fA(principal),C.green)}
-        ${extra>0?`<div style="margin-top:6px;padding:8px 10px;background:rgba(0,214,143,.08);border-radius:8px;font-size:12px;color:#6ee7b7">
-          ✓ <strong>${fA(extra)}</strong> above minimum — auto-logged as extra repayment
-        </div>`:''}
-      </div>
-      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:12px;color:${C.muted}">New loan balance</span>
-        <span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${C.green}">${fA(newBal)}</span>
-      </div>`;
-    return{newBal,off,rate,paid,extra};
+    const prev=document.getElementById('h-preview');
+    const nb=document.getElementById('h-newbal');
+    if(prev)prev.innerHTML=`<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+      <span style="color:${C.muted}">Interest: <strong style="color:${C.red};font-family:'DM Mono',monospace">${fA(int)}</strong></span>
+      <span style="color:${C.muted}">Principal: <strong style="color:${C.green};font-family:'DM Mono',monospace">${fA(principal)}</strong></span>
+      ${extra>0?`<span style="color:${C.green};font-size:12px">✓ +${fA(extra)} above minimum</span>`:''}
+    </div>`;
+    if(nb){nb.textContent=fA2(newBal);}
+    return{newBal,off,paid,extra,rate};
   }
-  // Rate-change toggle
+  ['h-paid','h-off'].forEach(id=>document.getElementById(id)?.addEventListener('input',updatePaymentPreview));
   document.getElementById('h-rate-toggle')?.addEventListener('click',()=>{
-    const panel=document.getElementById('h-rate-panel');
-    const arrow=document.getElementById('h-rate-arrow');
-    const open=panel?.style.display==='none';
-    if(panel) panel.style.display=open?'block':'none';
-    if(arrow) arrow.textContent=open?'▼':'▶';
+    const p=document.getElementById('h-rate-panel'),a=document.getElementById('h-rate-arrow');
+    const open=p?.style.display==='none';if(p)p.style.display=open?'block':'none';if(a)a.textContent=open?'▼':'▶';
   });
-
-  ['h-paid','h-off','h-rate'].forEach(id=>{
-    document.getElementById(id)?.addEventListener('input', updateHPreview);
-  });
-
   document.getElementById('h-save')?.addEventListener('click',()=>{
-    // Apply rate change if panel is open
     const ratePanel=document.getElementById('h-rate-panel');
     if(ratePanel?.style.display!=='none'){
-      const newRate=parseFloat(document.getElementById('h-rate')?.value)||D.loan.rate;
-      const newMinPmt=parseFloat((document.getElementById('h-newpmt')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment;
-      D.loan.rate=newRate; D.loan.payment=newMinPmt;
+      const nr=parseFloat(document.getElementById('h-rate')?.value)||D.loan.rate;
+      const np=parseFloat((document.getElementById('h-newpmt')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment;
+      D.loan.rate=nr;D.loan.payment=np;
     }
-    const{newBal,off,rate,paid,extra}=updateHPreview();
-    const m=document.getElementById('h-month')?.value||nowYM();
-    const n=document.getElementById('h-note')?.value.trim()||'';
+    const{newBal,off,paid,extra,rate}=updatePaymentPreview();
     if(!newBal||!paid)return;
-    const entry={id:gid(),month:m,balance:newBal,offset:off,rate:rate,note:n};
+    const m=nowYM();
+    const entry={id:gid(),month:m,balance:newBal,offset:off,rate:rate,note:''};
     if(extra>0){entry.extra=extra;entry.extraTransferred=false;}
     const idx=D.history.findIndex(h=>h.month===m);
     if(idx>=0)D.history[idx]={...D.history[idx],...entry,id:D.history[idx].id};
-    else D.history=[...D.history,entry].sort((a,b_)=>a.month.localeCompare(b_.month));
-    D.loan.balance=newBal; D.loan.offset=off; D.loan.rate=rate;
-    if(extra>0) D.repayments.push({id:gid(),date:new Date().toISOString().split('T')[0],amount:extra,description:'Extra in regular payment — '+fMo(m),type:'principal'});
-    saveData(); setTab('track');
+    else D.history=[...D.history,entry].sort((a,b)=>a.month.localeCompare(b.month));
+    D.loan.balance=newBal;D.loan.offset=off;D.loan.rate=rate;
+    if(extra>0)D.repayments.push({id:gid(),date:new Date().toISOString().split('T')[0],amount:extra,description:'Extra in regular payment — '+fMo(m),type:'principal'});
+    saveData();
+    const msg=document.getElementById('h-msg');if(msg){msg.textContent=`✓ Recorded — balance now ${fA2(newBal)}`;setTimeout(()=>msg.textContent='',4000);}
+    // Refresh just the balance/payoff display without full re-render
+    setTimeout(()=>renderApp(),100);
   });
 
-  // Extra repayment save
-  document.getElementById('e-save')?.addEventListener('click',()=>{
-    const a=parseFloat(document.getElementById('e-amt').value.replace(/[^0-9.]/g,''));
-    if(!a||a<=0)return;
-    D.repayments.push({id:gid(),date:document.getElementById('e-date').value,amount:a,description:document.getElementById('e-desc').value.trim(),type:document.getElementById('e-type').value});
-    saveData();setTab('extra');
-  });
-
-  // Calculator sliders
-  const cExtra=document.getElementById('c-extra'),cLump=document.getElementById('c-lump');
-  const updateSliders=()=>{
-    CX.extra=+(cExtra?.value||0);CX.lump=+(cLump?.value||0);
-    const lbl=document.getElementById('c-extra-lbl');if(lbl)lbl.textContent=fA(CX.extra);
-    const llbl=document.getElementById('c-lump-lbl');if(llbl)llbl.textContent=fA(CX.lump);
-    const ylbl=document.getElementById('c-yr-lbl');if(ylbl)ylbl.textContent=`${fA(CX.fn?(D.loan.payment+CX.extra)/2*26:(D.loan.payment+CX.extra)*12)}/yr`;
-    updateCalcDisplay();
-  };
-  cExtra?.addEventListener('input',updateSliders);
-  cLump?.addEventListener('input',updateSliders);
+  // ── Calculator (Tools) ─────────────────────────────────────────────
+  const CX=window._CX||{extra:0,lump:0,fn:false};
+  if(!window._CX)window._CX=CX;
+  function updateCalc(){
+    CX.extra=+(document.getElementById('c-extra')?.value||0);
+    CX.lump=+(document.getElementById('c-lump')?.value||0);
+    const lbl=document.getElementById('c-extra-lbl'),llbl=document.getElementById('c-lump-lbl');
+    if(lbl)lbl.textContent=fA(CX.extra);if(llbl)llbl.textContent=fA(CX.lump);
+    const l=D.loan,bal=l.balance,off=l.offset,rate=l.rate||6.04,pmt=l.payment||5832;
+    const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12}):{months:Infinity,totalInt:Infinity};
+    const cpmt=CX.fn?(pmt+CX.extra)/2:(pmt+CX.extra),cppy=CX.fn?26:12;
+    const cproj=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:cpmt,ppy:cppy,lump:CX.lump}):{months:Infinity,totalInt:Infinity};
+    const moS=isFinite(base.months)&&isFinite(cproj.months)?base.months-cproj.months:0;
+    const intS=isFinite(base.totalInt)&&isFinite(cproj.totalInt)?base.totalInt-cproj.totalInt:0;
+    const el=document.getElementById('calc-res');
+    if(el)el.innerHTML=[['Pays off',fD(cproj.months)],['Time left',fY(cproj.months)],['Sooner',moS>1?fY(moS)+' sooner':'—'],['Int. saved',intS>100?fA(intS):'—']].map(([l,v])=>`<div style="text-align:center"><div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${l}</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:${C.green}">${v}</div></div>`).join('');
+  }
+  document.getElementById('c-extra')?.addEventListener('input',updateCalc);
+  document.getElementById('c-lump')?.addEventListener('input',updateCalc);
   document.getElementById('c-fn')?.addEventListener('click',function(){
     CX.fn=!CX.fn;this.textContent=CX.fn?'✓ Fortnightly ON':'Switch to Fortnightly?';
     this.style.background=CX.fn?C.blue:'rgba(255,255,255,.09)';this.style.color=CX.fn?'#07090f':'#94a3b8';
-    updateCalcDisplay();
+    updateCalc();
   });
   document.getElementById('c-save')?.addEventListener('click',()=>{
-    D.strategy={extraMonthly:CX.extra,fortnightly:CX.fn,annualLump:CX.lump};
-    saveData();
-    const btn=document.getElementById('c-save');if(btn){const orig=btn.textContent;btn.textContent='✓ Saved!';setTimeout(()=>{btn.textContent=orig},2000);}
+    D.strategy={extraMonthly:CX.extra,fortnightly:CX.fn,annualLump:CX.lump};saveData();
+    const b=document.getElementById('c-save');if(b){const t=b.textContent;b.textContent='✓ Saved!';setTimeout(()=>b.textContent=t,2000);}
   });
-  // Windfall
-  const wfTxt=document.getElementById('wf-txt'),wfRange=document.getElementById('wf-range'),wfClear=document.getElementById('wf-clear');
-  const updateWf=v=>{
-    CX.wf=v;if(wfClear)wfClear.style.display=v>0?'block':'none';
-    updateCalcDisplay();
-  };
-  wfTxt?.addEventListener('input',function(){const r=this.value.replace(/[^0-9]/g,'');this.value=r?Number(r).toLocaleString():'';const v=r?+r:0;if(wfRange)wfRange.value=Math.min(v,200000);updateWf(v);});
-  wfRange?.addEventListener('input',function(){const v=+this.value;if(wfTxt)wfTxt.value=v>0?v.toLocaleString():'';updateWf(v);});
-  wfClear?.addEventListener('click',()=>{CX.wf=0;if(wfTxt)wfTxt.value='';if(wfRange)wfRange.value=0;if(wfClear)wfClear.style.display='none';const el=document.getElementById('wf-res');if(el)el.innerHTML='';});
-  if(TAB==='calc')updateCalcDisplay();
 
-  // Settings save
+  // ── Extra payments ─────────────────────────────────────────────────
+  document.getElementById('e-save')?.addEventListener('click',()=>{
+    const a=parseFloat((document.getElementById('e-amt')?.value||'').replace(/[^0-9.]/g,''));
+    if(!a||a<=0)return;
+    D.repayments.push({id:gid(),date:document.getElementById('e-date')?.value,amount:a,description:(document.getElementById('e-desc')?.value||'').trim(),type:document.getElementById('e-type')?.value||'principal'});
+    saveData();renderApp();
+  });
+
+  // ── Settings ───────────────────────────────────────────────────────
   document.getElementById('s-save')?.addEventListener('click',()=>{
-    const pn=id=>parseFloat((document.getElementById(id)?.value||'').replace(/[^0-9.]/g,''))||0;
-    D.loan.balance    = pn('s-bal');
-    D.loan.offset     = pn('s-off');
-    D.loan.rate       = parseFloat(document.getElementById('s-rate')?.value)||6.04;
-    D.loan.payment    = pn('s-pmt');
-    D.loan.origBalance= pn('s-orig');
-    D.loan.origEnd    = document.getElementById('s-end')?.value||'2051-09';
-    saveData();
-    renderApp(); // re-renders form from saved D.loan so user can see it stuck
+    const np=id=>parseFloat((document.getElementById(id)?.value||'').replace(/[^0-9.]/g,''))||0;
+    D.loan.balance=np('s-bal');D.loan.offset=np('s-off');
+    D.loan.rate=parseFloat(document.getElementById('s-rate')?.value)||6.04;
+    D.loan.payment=np('s-pmt');D.loan.origBalance=np('s-orig');
+    D.loan.origEnd=document.getElementById('s-end')?.value||'2051-09';
+    saveData();const m=document.getElementById('s-msg');if(m){m.textContent='Saved ✓';setTimeout(()=>m.textContent='',2500);}
+    renderApp();
   });
   document.getElementById('s-export')?.addEventListener('click',()=>{
     const blob=new Blob([JSON.stringify(D,null,2)],{type:'application/json'});
@@ -952,48 +522,40 @@ function attachEvents(){
   document.getElementById('s-import')?.addEventListener('click',()=>{
     const i=document.createElement('input');i.type='file';i.accept='.json';
     i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
-      r.onload=ev=>{try{D=JSON.parse(ev.target.result);saveData();setTab('sett');}catch{alert('Invalid backup file');}};r.readAsText(f);};
-    i.click();
+      r.onload=ev=>{try{D=JSON.parse(ev.target.result);saveData();renderApp();}catch{alert('Invalid file');}};r.readAsText(f);};i.click();
   });
   document.getElementById('s-reset')?.addEventListener('click',()=>{
-    if(confirm('Reset ALL data? This cannot be undone.')){D=JSON.parse(JSON.stringify(INIT));saveData();setTab('dash');}
+    if(confirm('Reset ALL data?')){D=JSON.parse(JSON.stringify(INIT));saveData();renderApp();}
   });
 }
 
-// ── GLOBAL HANDLERS (called via onclick in innerHTML) ─────────────────────────
-window.markTransferred=id=>{
-  const e=D.history.find(h=>h.id===id);
-  if(e){e.extraTransferred=true;}
-  saveData();renderApp();
-};
-window.delHistory=id=>{D.history=D.history.filter(h=>h.id!==id);saveData();setTab('track');};
-window.delRepayment=id=>{D.repayments=D.repayments.filter(r=>r.id!==id);saveData();setTab('extra');};
-window.goToCalc=(extra,fn,lump)=>{CX.extra=extra;CX.fn=!!fn;CX.lump=lump;setTab('calc');};
-
-// ── MAIN RENDER ───────────────────────────────────────────────────────────────
-const TABS=[{id:'dash',i:'📊',l:'Overview'},{id:'track',i:'📅',l:'History'},{id:'extra',i:'➕',l:'Extra Payments'},{id:'calc',i:'🧮',l:'Calculator'},{id:'sugg',i:'💡',l:'Suggestions'},{id:'sett',i:'⚙️',l:'Settings'}];
-
-function setTab(id){TAB=id;renderApp();}
+// ═══════════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════════
+const TABS=[{id:'dash',i:'🏠',l:'Dashboard'},{id:'tools',i:'🔧',l:'Tools'}];
 
 function renderApp(){
-  const tabContent={dash:renderDash,track:renderTrack,extra:renderExtra,calc:renderCalc,sugg:renderSugg,sett:renderSett}[TAB]?.();
-  const cur=TABS.find(t=>t.id===TAB);
+  const cur=TABS.find(t=>t.id===TAB)||TABS[0];
   document.getElementById('app').innerHTML=`
-<div style="background:${C.surf};border-bottom:1px solid ${C.border};position:sticky;top:0;z-index:20">
-  <div style="max-width:940px;margin:0 auto;padding:0 14px;display:flex;align-items:center;justify-content:space-between">
-    <div style="display:flex;overflow-x:auto">
-      ${TABS.map(t=>`<button onclick="setTab('${t.id}')" style="padding:13px 12px;border:none;background:transparent;color:${TAB===t.id?C.blue:C.muted};font-weight:${TAB===t.id?700:500};font-size:12px;cursor:pointer;border-bottom:2px solid ${TAB===t.id?C.blue:'transparent'};display:flex;align-items:center;gap:5px;white-space:nowrap;transition:color .15s"><span>${t.i}</span><span class="nav-lbl">${t.l}</span></button>`).join('')}
+<div style="background:#0c1018;border-bottom:1px solid rgba(255,255,255,.07);position:sticky;top:0;z-index:20">
+  <div style="max-width:860px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex">
+      ${TABS.map(t=>`<button onclick="setTab('${t.id}')" style="padding:14px 16px;border:none;background:transparent;color:${TAB===t.id?C.blue:C.muted};font-weight:${TAB===t.id?700:500};font-size:14px;cursor:pointer;border-bottom:2px solid ${TAB===t.id?C.blue:'transparent'};display:flex;align-items:center;gap:7px;transition:color .15s">
+        <span>${t.i}</span><span>${t.l}</span>
+      </button>`).join('')}
     </div>
-    <div id="si" style="font-size:10px;color:${C.muted};font-family:'DM Mono',monospace;flex-shrink:0">Mortgage Dashboard</div>
+    <div id="si" style="font-size:11px;color:${C.muted};font-family:'DM Mono',monospace"></div>
   </div>
 </div>
-<div style="background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(56,189,248,.1),transparent);border-bottom:1px solid ${C.border};padding:20px 14px 16px">
-  <div style="max-width:940px;margin:0 auto">
+<div style="background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(56,189,248,.08),transparent);border-bottom:1px solid rgba(255,255,255,.05);padding:18px 16px 14px">
+  <div style="max-width:860px;margin:0 auto">
     <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;color:${C.blue};text-transform:uppercase;margin-bottom:4px">Home Loan · Melbourne</div>
-    <h1 style="font-family:'Syne',sans-serif;font-size:clamp(20px,5vw,32px);font-weight:800;letter-spacing:-1px;margin:0">${cur.i} ${cur.l}</h1>
+    <h1 style="font-family:'Syne',sans-serif;font-size:clamp(22px,5vw,34px);font-weight:800;letter-spacing:-1px;margin:0">${cur.i} ${cur.l}</h1>
   </div>
 </div>
-<div style="max-width:940px;margin:0 auto;padding:24px 14px 60px">${tabContent||''}</div>`;
+<div style="max-width:860px;margin:0 auto;padding:24px 16px 60px">
+  ${TAB==='dash'?renderDash():renderTools()}
+</div>`;
   attachEvents();
 }
 
