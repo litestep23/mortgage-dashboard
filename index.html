@@ -395,8 +395,8 @@ function renderExtra(){
 
   return`<div>
 <div style="margin-bottom:18px">
-  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px">➕ Extra Repayments Tracker</h2>
-  <p style="font-size:12px;color:${C.muted};margin:0">Log any payments beyond your minimum — tax refunds, bonuses, windfalls.</p>
+  <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px">➕ Extra Payments</h2>
+  <p style="font-size:12px;color:${C.muted};margin:0">For <strong style="color:${C.text}">separate</strong> transfers beyond your regular payment — tax refunds, bonuses, lump sums, windfalls. <span style="color:${C.blue}">Your regular monthly payment? Log that in 📅 History.</span></p>
 </div>
 ${total>0?`<div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
   ${stat('Total Extra Paid',fA(total),`${rows.length} payments`,C.green)}
@@ -940,7 +940,7 @@ window.delRepayment=id=>{D.repayments=D.repayments.filter(r=>r.id!==id);saveData
 window.goToCalc=(extra,fn,lump)=>{CX.extra=extra;CX.fn=!!fn;CX.lump=lump;setTab('calc');};
 
 // ── MAIN RENDER ───────────────────────────────────────────────────────────────
-const TABS=[{id:'dash',i:'📊',l:'Overview'},{id:'track',i:'📅',l:'History'},{id:'extra',i:'➕',l:'Repayments'},{id:'calc',i:'🧮',l:'Calculator'},{id:'sugg',i:'💡',l:'Suggestions'},{id:'sett',i:'⚙️',l:'Settings'}];
+const TABS=[{id:'dash',i:'📊',l:'Overview'},{id:'track',i:'📅',l:'History'},{id:'extra',i:'➕',l:'Extra Payments'},{id:'calc',i:'🧮',l:'Calculator'},{id:'sugg',i:'💡',l:'Suggestions'},{id:'sett',i:'⚙️',l:'Settings'}];
 
 function setTab(id){TAB=id;renderApp();}
 
