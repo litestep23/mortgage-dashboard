@@ -73,19 +73,8 @@ const INP=`background:#111827;border:1px solid rgba(255,255,255,.12);border-radi
 const kv=(l,v,c)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${C.border}"><span style="font-size:12px;color:${C.muted}">${l}</span><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:${c||C.text}">${v}</span></div>`;
 const pbtn=(l,id,bg)=>`<button id="${id}" style="padding:10px 20px;border-radius:8px;border:none;background:${bg};color:#07090f;font-weight:700;font-size:14px">${l}</button>`;
 
-// ── Transfer reminders ────────────────────────────────────────────────────────
-function reminderBanner(){
-  const pending=D.history.filter(h=>h.extra>0&&!h.extraTransferred);
-  if(!pending.length)return'';
-  return pending.map(p=>`<div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);border-radius:14px;padding:16px 18px;margin-bottom:18px;display:flex;gap:14px;align-items:flex-start">
-    <span style="font-size:20px;flex-shrink:0">⏰</span>
-    <div style="flex:1">
-      <div style="font-weight:700;font-size:14px;color:${C.amber};margin-bottom:4px">Transfer Reminder — ${fMo(p.month)}</div>
-      <p style="font-size:13px;color:${C.muted};margin:0 0 10px;line-height:1.6">You paid <strong style="color:${C.text}">${fA(p.extra)}</strong> above your minimum. This is sitting in your offset — to reduce the actual loan balance, transfer <strong style="color:${C.amber}">${fA(p.extra)}</strong> directly to your loan account.</p>
-      <button onclick="markTransferred('${p.id}')" style="padding:7px 16px;border-radius:7px;border:none;background:${C.amber};color:#07090f;font-weight:700;font-size:12px;cursor:pointer">✓ Done — I've transferred it</button>
-    </div>
-  </div>`).join('');
-}
+// ── Transfer reminders (disabled - offset IS the strategy) ──────────────────
+function reminderBanner(){ return ''; }
 
 // ── SVG chart (simple) ────────────────────────────────────────────────────────
 function svgChart(hist,proj,base){
@@ -194,29 +183,46 @@ ${reminderBanner()}
 
 <!-- PAYMENT LOGGER -->
 <div style="background:linear-gradient(135deg,rgba(0,214,143,.08),rgba(56,189,248,.04));border:1px solid rgba(0,214,143,.25);border-radius:18px;padding:22px;margin-bottom:20px">
-  <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">Log a Payment</div>
-  <p style="font-size:12px;color:${C.muted};margin:0 0 18px">Enter what you paid — the new balance is calculated for you.</p>
+  <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">📅 Record Monthly Payment</div>
+  <p style="font-size:12px;color:${C.muted};margin:0 0 18px">On the 13th, your bank automatically deducts ${fA(pmt)} from your offset account to pay the loan.</p>
+
   <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     <div>
-      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">How much did you pay? ($)</label>
-      <input id="h-paid" value="${pmt}" style="${INP}">
-      <div style="font-size:10px;color:${C.muted};margin-top:4px">Minimum is ${fA(pmt)} — enter whatever you actually paid</div>
+      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">Your offset balance ($)</label>
+      <input id="h-offset-now" value="${Math.round(lastOff)}" style="${INP}">
+      <div id="h-deducted-row" style="margin-top:12px">
+        <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:8px">Has the ${fA(pmt)} been deducted yet?</label>
+        <div style="display:flex;gap:10px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="radio" id="h-deducted-yes" name="h-deducted" value="yes" checked style="accent-color:${C.green}"> Yes — already deducted
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="radio" id="h-deducted-no" name="h-deducted" value="no" style="accent-color:${C.blue}"> Not yet
+          </label>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">Note (optional)</label>
+        <input id="h-note" placeholder="e.g. Put in $800 extra this month" style="${INP}">
+      </div>
     </div>
-    <div>
-      <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:6px">Offset balance today ($)</label>
-      <input id="h-off" value="${Math.round(lastOff)}" style="${INP}">
-    </div>
-  </div>
-
-  <!-- Live preview -->
-  <div id="h-preview" style="background:rgba(0,0,0,.2);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
-    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
-      <span style="color:${C.muted}">Interest: <strong style="color:${C.red};font-family:'DM Mono',monospace">${fA(initInt)}</strong></span>
-      <span style="color:${C.muted}">Principal: <strong style="color:${C.green};font-family:'DM Mono',monospace">${fA(initPrincipal)}</strong></span>
-    </div>
-    <div style="text-align:right">
-      <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">New balance</div>
-      <div id="h-newbal" style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:${C.green}">${fA2(initNewBal)}</div>
+    <div id="h-preview" style="background:rgba(0,0,0,.2);border-radius:12px;padding:16px">
+      ${(()=>{
+        const isDeducted=true;
+        const offsetBefore=isDeducted?(lastOff+pmt):lastOff;
+        const int2=Math.max(0,lastBal-offsetBefore)*rate/100/12;
+        const principal2=Math.max(0,pmt-int2);
+        const newLoan=Math.round(Math.max(0,lastBal-principal2)*100)/100;
+        const newOffset=isDeducted?lastOff:lastOff-pmt;
+        return`<div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
+          ${kv('Offset before deduction',fA(offsetBefore))}
+          ${kv('Interest charged','− '+fA(int2),C.red)}
+          ${kv('Principal paid',fA(principal2),C.green)}
+          <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
+            ${kv('New loan balance',fA2(newLoan),C.green)}
+            ${kv('New offset balance',fA(Math.max(0,newOffset)),C.blue)}
+          </div>`;
+      })()}
     </div>
   </div>
 
@@ -237,8 +243,7 @@ ${reminderBanner()}
   </div>
 
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    ${pbtn('✓ Record Payment','h-save',C.green)}
-    <span style="font-size:11px;color:${C.muted}">Month: ${fMo(nowYM())}</span>
+    ${pbtn('✓ Record This Month','h-save',C.green)}
     <span id="h-msg" style="font-size:12px;color:${C.green};font-family:'DM Mono',monospace"></span>
   </div>
 </div>
@@ -344,14 +349,14 @@ function renderTools(){
   // ── Extra payments ────────────────────────────────────────────────────────
   const erows=[...D.repayments].sort((a,b)=>b.date.localeCompare(a.date));
   const etotal=D.repayments.reduce((s,r)=>s+r.amount,0);
-  const TC={offset:'#38bdf8',principal:'#00d68f',lump:'#fbbf24',windfall:'#c084fc'};
-  const TL={offset:'Offset',principal:'Repayment',lump:'Lump Sum',windfall:'Windfall'};
+  const TC={offset:'#38bdf8',loan:'#00d68f',principal:'#00d68f',lump:'#fbbf24',windfall:'#c084fc'};
+  const TL={offset:'→ Offset',loan:'→ Loan',principal:'→ Loan',lump:'→ Loan',windfall:'→ Offset'};
   const extraHTML=`<div style="background:linear-gradient(135deg,rgba(0,214,143,.07),rgba(56,189,248,.03));border:1px solid rgba(0,214,143,.2);border-radius:12px;padding:16px;margin-bottom:14px">
     <div style="font-size:13px;font-weight:700;color:#00d68f;margin-bottom:12px">Log a separate extra payment</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-bottom:12px">
       <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Date</label><input id="e-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="${INP}"></div>
       <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Amount ($)</label><input id="e-amt" placeholder="e.g. 5000" style="${INP}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Type</label><select id="e-type" style="${INP}"><option value="offset">Added to Offset</option><option value="principal">Extra Repayment</option><option value="lump">Annual Lump Sum</option><option value="windfall">Windfall</option></select></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Type</label><select id="e-type" style="${INP}"><option value="offset">💧 Added to Offset account (offsets interest, stays accessible)</option><option value="loan">🏦 Sent directly to Loan account (reduces principal, locked in)</option><option value="lump">🏦 Lump sum to Loan account</option><option value="windfall">💧 Windfall to Offset account</option></select></div>
       <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Description</label><input id="e-desc" placeholder="e.g. Tax refund" style="${INP}"></div>
     </div>
     ${pbtn('✓ Log','e-save','#00d68f')}
@@ -436,52 +441,60 @@ function setTab(id){TAB=id;renderApp();}
 // ═══════════════════════════════════════════════════════════════════════
 function attachEvents(){
   // ── Payment logger (Dashboard) ─────────────────────────────────────
+  function isDeducted(){ return document.querySelector('input[name="h-deducted"]:checked')?.value === 'yes'; }
+
   function updatePaymentPreview(){
     const lastEntry=D.history.length>0?D.history[D.history.length-1]:D.loan;
     const lastBal=lastEntry.balance||D.loan.balance||0;
-    const off=parseFloat((document.getElementById('h-off')?.value||'').replace(/[^0-9.]/g,''))||0;
-    const paid=parseFloat((document.getElementById('h-paid')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment||5832;
-    const rate=D.loan.rate||6.04,minPmt=D.loan.payment||5832;
-    const int=Math.max(0,lastBal-off)*rate/100/12;
-    const principal=Math.max(0,paid-int);
-    const newBal=Math.round(Math.max(0,lastBal-principal)*100)/100;
-    const extra=Math.max(0,paid-minPmt);
-    const prev=document.getElementById('h-preview');
-    const nb=document.getElementById('h-newbal');
-    if(prev)prev.innerHTML=`<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
-      <span style="color:${C.muted}">Interest: <strong style="color:${C.red};font-family:'DM Mono',monospace">${fA(int)}</strong></span>
-      <span style="color:${C.muted}">Principal: <strong style="color:${C.green};font-family:'DM Mono',monospace">${fA(principal)}</strong></span>
-      ${extra>0?`<span style="color:${C.green};font-size:12px">✓ +${fA(extra)} above minimum</span>`:''}
-    </div>`;
-    if(nb){nb.textContent=fA2(newBal);}
-    return{newBal,off,paid,extra,rate};
+    const enteredOff=parseFloat((document.getElementById('h-offset-now')?.value||'').replace(/[^0-9.]/g,''))||0;
+    const deducted=isDeducted();
+    const pmt=D.loan.payment||5832, rate=D.loan.rate||6.04;
+    const offsetBefore=deducted?(enteredOff+pmt):enteredOff;
+    const offsetAfter=deducted?enteredOff:(enteredOff-pmt);
+    const int2=Math.max(0,lastBal-offsetBefore)*rate/100/12;
+    const principal2=Math.max(0,pmt-int2);
+    const newLoan=Math.round(Math.max(0,lastBal-principal2)*100)/100;
+    const newOffset=Math.max(0,offsetAfter);
+    const el=document.getElementById('h-preview');
+    if(el)el.innerHTML=`
+      <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
+      ${kv('Offset before deduction',fA(offsetBefore))}
+      ${kv('Interest charged','− '+fA(int2),C.red)}
+      ${kv('Principal paid',fA(principal2),C.green)}
+      <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
+        ${kv('New loan balance',fA2(newLoan),C.green)}
+        ${kv('New offset balance',fA(newOffset),C.blue)}
+      </div>`;
+    return{newLoan,newOffset,int2,principal2};
   }
-  ['h-paid','h-off'].forEach(id=>document.getElementById(id)?.addEventListener('input',updatePaymentPreview));
+
+  document.getElementById('h-offset-now')?.addEventListener('input',updatePaymentPreview);
+  document.querySelectorAll('input[name="h-deducted"]').forEach(r=>r.addEventListener('change',updatePaymentPreview));
+
   document.getElementById('h-rate-toggle')?.addEventListener('click',()=>{
     const p=document.getElementById('h-rate-panel'),a=document.getElementById('h-rate-arrow');
     const open=p?.style.display==='none';if(p)p.style.display=open?'block':'none';if(a)a.textContent=open?'▼':'▶';
   });
+
   document.getElementById('h-save')?.addEventListener('click',()=>{
     const ratePanel=document.getElementById('h-rate-panel');
     if(ratePanel?.style.display!=='none'){
       const nr=parseFloat(document.getElementById('h-rate')?.value)||D.loan.rate;
       const np=parseFloat((document.getElementById('h-newpmt')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment;
-      D.loan.rate=nr;D.loan.payment=np;
+      D.loan.rate=nr; D.loan.payment=np;
     }
-    const{newBal,off,paid,extra,rate}=updatePaymentPreview();
-    if(!newBal||!paid)return;
-    const m=nowYM();
-    const entry={id:gid(),month:m,balance:newBal,offset:off,rate:rate,note:''};
-    if(extra>0){entry.extra=extra;entry.extraTransferred=false;}
+    const{newLoan,newOffset}=updatePaymentPreview();
+    if(!newLoan)return;
+    const m=nowYM(), n=(document.getElementById('h-note')?.value||'').trim();
+    const entry={id:gid(),month:m,balance:newLoan,offset:newOffset,rate:D.loan.rate,note:n};
     const idx=D.history.findIndex(h=>h.month===m);
     if(idx>=0)D.history[idx]={...D.history[idx],...entry,id:D.history[idx].id};
     else D.history=[...D.history,entry].sort((a,b)=>a.month.localeCompare(b.month));
-    D.loan.balance=newBal;D.loan.offset=off;D.loan.rate=rate;
-    if(extra>0)D.repayments.push({id:gid(),date:new Date().toISOString().split('T')[0],amount:extra,description:'Extra in regular payment — '+fMo(m),type:'principal'});
+    D.loan.balance=newLoan; D.loan.offset=newOffset;
     saveData();
-    const msg=document.getElementById('h-msg');if(msg){msg.textContent=`✓ Recorded — balance now ${fA2(newBal)}`;setTimeout(()=>msg.textContent='',4000);}
-    // Refresh just the balance/payoff display without full re-render
-    setTimeout(()=>renderApp(),100);
+    const msg=document.getElementById('h-msg');
+    if(msg){msg.textContent=`✓ Recorded — loan ${fA2(newLoan)}, offset ${fA(newOffset)}`;setTimeout(()=>msg.textContent='',5000);}
+    setTimeout(()=>renderApp(),200);
   });
 
   // ── Calculator (Tools) ─────────────────────────────────────────────
@@ -519,8 +532,16 @@ function attachEvents(){
   // ── Extra payments ─────────────────────────────────────────────────
   document.getElementById('e-save')?.addEventListener('click',()=>{
     const a=parseFloat((document.getElementById('e-amt')?.value||'').replace(/[^0-9.]/g,''));
+    const type=document.getElementById('e-type')?.value||'offset';
     if(!a||a<=0)return;
-    D.repayments.push({id:gid(),date:document.getElementById('e-date')?.value,amount:a,description:(document.getElementById('e-desc')?.value||'').trim(),type:document.getElementById('e-type')?.value||'principal'});
+    // Update correct account balance immediately
+    if(type==='offset'||type==='windfall'){
+      D.loan.offset=Math.round((D.loan.offset+a)*100)/100;
+    } else {
+      // direct to loan or lump sum to loan
+      D.loan.balance=Math.round(Math.max(0,D.loan.balance-a)*100)/100;
+    }
+    D.repayments.push({id:gid(),date:document.getElementById('e-date')?.value,amount:a,description:(document.getElementById('e-desc')?.value||'').trim(),type});
     saveData();renderApp();
   });
 
