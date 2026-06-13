@@ -343,6 +343,21 @@ function renderTrack(){
         <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Note <span style="font-weight:400">optional</span></label>
           <input id="h-note" placeholder="e.g. Rate dropped" style="${INP}"></div>
       </div>
+      <div style="margin-bottom:16px">
+        <button id="h-rate-toggle" style="background:none;border:none;padding:0;color:${C.blue};font-size:12px;cursor:pointer;font-family:'Mulish',sans-serif;display:flex;align-items:center;gap:5px">
+          <span id="h-rate-arrow">▶</span> Rate or repayment changed this month?
+        </button>
+        <div id="h-rate-panel" style="display:none;margin-top:12px;padding:14px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:10px">
+          <div style="font-size:12px;color:${C.amber};font-weight:600;margin-bottom:10px">Update rate &amp; repayment</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">New interest rate (% p.a.)</label>
+              <input id="h-rate" type="number" step="0.01" value="${rate}" style="${INP}"></div>
+            <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">New minimum repayment ($)</label>
+              <input id="h-newpmt" value="${minPmt}" style="${INP}"></div>
+          </div>
+          <p style="font-size:11px;color:${C.muted};margin:8px 0 0;line-height:1.5">These will update your loan settings and all future projections.</p>
+        </div>
+      </div>
       ${pbtn('✓ Record Payment','h-save',C.green)}
       <p style="font-size:11px;color:${C.muted};margin-top:10px;margin-bottom:0">Based on last recorded balance of <strong style="color:${C.text}">${fA(lastBal)}</strong></p>
     </div>
@@ -817,11 +832,27 @@ function attachEvents(){
       </div>`;
     return{newBal,off,rate,paid,extra};
   }
-  ['h-paid','h-off'].forEach(id=>{
+  // Rate-change toggle
+  document.getElementById('h-rate-toggle')?.addEventListener('click',()=>{
+    const panel=document.getElementById('h-rate-panel');
+    const arrow=document.getElementById('h-rate-arrow');
+    const open=panel?.style.display==='none';
+    if(panel) panel.style.display=open?'block':'none';
+    if(arrow) arrow.textContent=open?'▼':'▶';
+  });
+
+  ['h-paid','h-off','h-rate'].forEach(id=>{
     document.getElementById(id)?.addEventListener('input', updateHPreview);
   });
 
   document.getElementById('h-save')?.addEventListener('click',()=>{
+    // Apply rate change if panel is open
+    const ratePanel=document.getElementById('h-rate-panel');
+    if(ratePanel?.style.display!=='none'){
+      const newRate=parseFloat(document.getElementById('h-rate')?.value)||D.loan.rate;
+      const newMinPmt=parseFloat((document.getElementById('h-newpmt')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment;
+      D.loan.rate=newRate; D.loan.payment=newMinPmt;
+    }
     const{newBal,off,rate,paid,extra}=updateHPreview();
     const m=document.getElementById('h-month')?.value||nowYM();
     const n=document.getElementById('h-note')?.value.trim()||'';
