@@ -249,13 +249,28 @@ ${D.history.length>1?`<div class="card">
   <p style="font-size:12px;color:${C.muted};margin:0 0 14px">Your actual progress vs projection</p>
   ${svgChart(D.history,proj,proj)}
 </div>`:''}
+
+${(()=>{
+  const hrows=[...D.history].sort((a,b)=>b.month.localeCompare(a.month));
+  const histBody=hrows.length===0
+    ?`<p style="color:${C.muted};font-size:13px;padding:4px 0">No payments recorded yet — log one above.</p>`
+    :`<div style="overflow-x:auto"><table><thead><tr><th>Month</th><th>Balance</th><th>Offset</th><th>Change</th><th></th></tr></thead><tbody>
+    ${hrows.map((h,i)=>{
+      const nx=hrows[i+1],ch=nx?h.balance-nx.balance:null;
+      const chStr=ch!=null?`<span style="font-family:'DM Mono',monospace;color:${ch>0?C.green:C.red};font-weight:600">${ch>0?'↓':ch<0?'↑':'–'}${ch!==0?' '+fA(Math.abs(ch)):''}</span>`:'';
+      return`<tr><td><span style="font-family:'DM Mono',monospace;font-weight:600">${fMo(h.month)}</span></td><td style="font-family:'DM Mono',monospace">${fA2(h.balance)}</td><td style="font-family:'DM Mono',monospace;color:${C.green}">${fA(h.offset)}</td><td>${chStr}</td><td><button onclick="delHistory('${h.id}')" style="background:none;border:none;color:${C.muted};font-size:18px;padding:2px 8px;cursor:pointer">✕</button></td></tr>`;
+    }).join('')}
+    </tbody></table></div><div style="font-size:11px;color:${C.muted};padding:8px 0">${hrows.length} entries · tap ✕ to delete</div>`;
+  return collSec('dash-hist','📅','Payment History',histBody);
+})()}
+
 </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // TOOLS
 // ═══════════════════════════════════════════════════════════════════════
-window._sec=window._sec||{calc:true,sugg:false,extra:false,hist:true,sett:false};
+window._sec=window._sec||{calc:true,sugg:false,extra:false,hist:true,sett:false,'dash-hist':false};
 window.secToggle=function(k){
   window._sec[k]=!window._sec[k];
   const el=document.getElementById('sec-'+k),ar=document.getElementById('arr-'+k);
@@ -334,10 +349,10 @@ function renderTools(){
   const extraHTML=`<div style="background:linear-gradient(135deg,rgba(0,214,143,.07),rgba(56,189,248,.03));border:1px solid rgba(0,214,143,.2);border-radius:12px;padding:16px;margin-bottom:14px">
     <div style="font-size:13px;font-weight:700;color:#00d68f;margin-bottom:12px">Log a separate extra payment</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-bottom:12px">
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Date</label><input id="e-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="${INP_str}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Amount ($)</label><input id="e-amt" placeholder="e.g. 5000" style="${INP_str}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Type</label><select id="e-type" style="${INP_str}"><option value="offset">Added to Offset</option><option value="principal">Extra Repayment</option><option value="lump">Annual Lump Sum</option><option value="windfall">Windfall</option></select></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Description</label><input id="e-desc" placeholder="e.g. Tax refund" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Date</label><input id="e-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="${INP}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Amount ($)</label><input id="e-amt" placeholder="e.g. 5000" style="${INP}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Type</label><select id="e-type" style="${INP}"><option value="offset">Added to Offset</option><option value="principal">Extra Repayment</option><option value="lump">Annual Lump Sum</option><option value="windfall">Windfall</option></select></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Description</label><input id="e-desc" placeholder="e.g. Tax refund" style="${INP}"></div>
     </div>
     ${pbtn('✓ Log','e-save','#00d68f')}
     <p style="font-size:11px;color:#4b5674;margin-top:10px;margin-bottom:0">Use this for separate transfers — tax refunds, bonuses, windfalls. Regular payments are logged automatically from the Dashboard.</p>
@@ -358,12 +373,12 @@ function renderTools(){
   const settHTML=`<div class="card" style="margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;margin-bottom:12px">Loan Details</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Loan Balance ($)</label><input id="s-bal" value="${l.balance?Math.round(l.balance*100)/100:''}" style="${INP_str}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Offset Balance ($)</label><input id="s-off" value="${l.offset?Math.round(l.offset*100)/100:''}" style="${INP_str}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Interest Rate (% p.a.)</label><input id="s-rate" value="${l.rate||''}" style="${INP_str}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Monthly Repayment ($)</label><input id="s-pmt" value="${l.payment||''}" style="${INP_str}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Original Loan Amount ($)</label><input id="s-orig" value="${l.origBalance||''}" style="${INP_str}"></div>
-      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label><input id="s-end" value="${l.origEnd||''}" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Loan Balance ($)</label><input id="s-bal" value="${l.balance?Math.round(l.balance*100)/100:''}" style="${INP}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Offset Balance ($)</label><input id="s-off" value="${l.offset?Math.round(l.offset*100)/100:''}" style="${INP}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Interest Rate (% p.a.)</label><input id="s-rate" value="${l.rate||''}" style="${INP}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Monthly Repayment ($)</label><input id="s-pmt" value="${l.payment||''}" style="${INP}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Original Loan Amount ($)</label><input id="s-orig" value="${l.origBalance||''}" style="${INP}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label><input id="s-end" value="${l.origEnd||''}" style="${INP}"></div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       ${pbtn('💾 Save Loan Details','s-save','#38bdf8')}
