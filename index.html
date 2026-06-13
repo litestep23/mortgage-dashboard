@@ -253,154 +253,156 @@ ${D.history.length>1?`<div class="card">
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// TOOLS — everything else
+// TOOLS
 // ═══════════════════════════════════════════════════════════════════════
+window._sec=window._sec||{calc:true,sugg:false,extra:false,hist:true,sett:false};
+window.secToggle=function(k){
+  window._sec[k]=!window._sec[k];
+  const el=document.getElementById('sec-'+k),ar=document.getElementById('arr-'+k);
+  if(el)el.style.display=window._sec[k]?'block':'none';
+  if(ar)ar.textContent=window._sec[k]?'▼':'▶';
+};
+
+function collSec(k,icon,title,body){
+  const open=!!window._sec[k];
+  return`<div style="margin-bottom:10px;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden">
+    <button onclick="secToggle('${k}')" style="width:100%;padding:14px 18px;border:none;background:rgba(255,255,255,.02);cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left">
+      <span style="font-size:18px">${icon}</span>
+      <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#e2e8f5;flex:1">${title}</span>
+      <span id="arr-${k}" style="color:#4b5674;font-size:14px">${open?'▼':'▶'}</span>
+    </button>
+    <div id="sec-${k}" style="display:${open?'block':'none'};padding:18px;border-top:1px solid rgba(255,255,255,.07)">${body}</div>
+  </div>`;
+}
+
 function renderTools(){
   const l=D.loan,bal=l.balance,off=l.offset,rate=l.rate||6.04,pmt=l.payment||5832;
   const LUMP=[1000,2000,4000,8000,10000],LCOLS=['#fb923c','#fbbf24','#4ade80','#38bdf8','#c084fc'];
   const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12}):{months:Infinity,totalInt:Infinity,pts:[]};
-
-  // ── Suggestions ────────────────────────────────────────────────────────────
-  const wk50mo=Math.round(50*52/12),wk100mo=Math.round(100*52/12);
-  const sv=r=>({mo:isFinite(base.months)&&isFinite(r.months)?base.months-r.months:0,int:isFinite(base.totalInt)&&isFinite(r.totalInt)?base.totalInt-r.totalInt:0});
-  const SUGG=bal>0?[
-    {icon:'🔄',color:C.blue,title:'Switch to fortnightly payments',detail:`Pay ${fA(Math.round(pmt/2))} every fortnight — 26 payments/year means one free extra payment annually.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2,ppy:26}),act:{extra:0,fn:true,lump:0}},
-    {icon:'☕',color:C.orange,title:'Add $50 per week',detail:`${fA(wk50mo)}/month extra — small and sustainable.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk50mo,ppy:12}),act:{extra:wk50mo,fn:false,lump:0}},
-    {icon:'💪',color:C.green,title:'Add $100 per week',detail:`${fA(wk100mo)}/month extra — a meaningful commitment.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk100mo,ppy:12}),act:{extra:wk100mo,fn:false,lump:0}},
-    {icon:'🎁',color:C.amber,title:'Put your tax refund at it every year',detail:`$3,000 annual lump sum — zero change to monthly budget.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:3000}),act:{extra:0,fn:false,lump:3000}},
-    {icon:'🪣',color:C.purple,title:'Grow your offset by $10,000',detail:`Saves ${fA(10000*rate/100)} per year in interest — and it's still your money.`,r:amort({balance:bal,offset:off+10000,ratePA:rate,pmt,ppy:12}),act:null},
-    {icon:'🚀',color:C.green,title:'Go fortnightly AND add $50/week',detail:`Both strategies combined — the compound effect is greater than either alone.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2+wk50mo/2,ppy:26}),act:{extra:wk50mo,fn:true,lump:0}},
-  ]:[];
-  const suggCards=SUGG.map(s=>{
-    const{mo,int}=sv(s.r);
-    const badge=(txt,col)=>`<span style="padding:4px 10px;border-radius:6px;background:${col}20;color:${col};font-size:12px;font-weight:700;font-family:'DM Mono',monospace">${txt}</span>`;
-    return`<div style="background:rgba(255,255,255,.02);border:1px solid ${C.border};border-left:3px solid ${s.color};border-radius:14px;padding:18px;display:flex;align-items:flex-start;gap:14px">
-      <div style="font-size:24px;flex-shrink:0">${s.icon}</div>
-      <div style="flex:1">
-        <div style="font-weight:700;font-size:14px;margin-bottom:4px">${s.title}</div>
-        <div style="font-size:12px;color:${C.muted};margin-bottom:10px;line-height:1.5">${s.detail}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          ${mo>0?badge('⏱ '+fY(mo)+' sooner',C.green):''}
-          ${int>0?badge('💰 Save '+fA(int),C.green):''}
-          ${s.act?`<button onclick="goToCalc(${s.act.extra},${s.act.fn},${s.act.lump})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:${C.muted};font-size:12px;cursor:pointer">Try in calculator →</button>`:''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  // ── Calculator state ────────────────────────────────────────────────────────
-  const CXe=window._CX||{extra:D.strategy.extraMonthly||0,lump:D.strategy.annualLump||0,fn:D.strategy.fortnightly||false,wf:0};
+  const CXe=window._CX||{extra:D.strategy.extraMonthly||0,lump:D.strategy.annualLump||0,fn:D.strategy.fortnightly||false};
   window._CX=CXe;
   const cpmt=CXe.fn?(pmt+CXe.extra)/2:(pmt+CXe.extra),cppy=CXe.fn?26:12;
   const cproj=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt:cpmt,ppy:cppy,lump:CXe.lump}):{months:Infinity,totalInt:Infinity};
   const cmoS=isFinite(base.months)&&isFinite(cproj.months)?base.months-cproj.months:0;
   const cintS=isFinite(base.totalInt)&&isFinite(cproj.totalInt)?base.totalInt-cproj.totalInt:0;
-  const lumpRows=LUMP.map((ls,i)=>{const r=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:ls}):{months:Infinity,totalInt:Infinity};return`<tr><td style="font-family:'DM Mono',monospace;font-weight:700;color:${LCOLS[i]}">${fA(ls)}</td><td style="font-family:'DM Mono',monospace">${fD(r.months)}</td><td style="font-weight:600">${fY(r.months)}</td><td style="font-family:'DM Mono',monospace;color:${C.green};font-weight:700">${isFinite(base.months)&&isFinite(r.months)?fY(base.months-r.months):'—'}</td><td style="font-family:'DM Mono',monospace;color:${C.green};font-weight:700">${isFinite(base.totalInt)&&isFinite(r.totalInt)?fA(base.totalInt-r.totalInt):'—'}</td></tr>`;}).join('');
+  const LUMPROWS=LUMP.map((ls,i)=>{const r=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:ls}):{months:Infinity,totalInt:Infinity};return`<tr><td style="font-family:'DM Mono',monospace;font-weight:700;color:${LCOLS[i]}">${fA(ls)}</td><td style="font-family:'DM Mono',monospace">${fD(r.months)}</td><td style="font-weight:600">${fY(r.months)}</td><td style="font-family:'DM Mono',monospace;color:#00d68f;font-weight:700">${isFinite(base.months)&&isFinite(r.months)?fY(base.months-r.months):'—'}</td><td style="font-family:'DM Mono',monospace;color:#00d68f;font-weight:700">${isFinite(base.totalInt)&&isFinite(r.totalInt)?fA(base.totalInt-r.totalInt):'—'}</td></tr>`;}).join('');
 
-  // ── History table ───────────────────────────────────────────────────────────
-  const hrows=[...D.history].sort((a,b)=>b.month.localeCompare(a.month));
-  const histTable=hrows.length===0?`<p style="color:${C.muted};font-size:13px;padding:20px 0">No payments logged yet — use the Dashboard to record them.</p>`
-    :`<div style="overflow-x:auto"><table><thead><tr><th>Month</th><th>Balance</th><th>Offset</th><th>Change</th><th>Note</th><th></th></tr></thead><tbody>
-    ${hrows.map((h,i)=>{const nx=hrows[i+1],ch=nx?h.balance-nx.balance:null;const chStr=ch!=null?`<span style="font-family:'DM Mono',monospace;color:${ch>0?C.green:C.red};font-weight:600">${ch>0?'↓':ch<0?'↑':'–'}${ch!==0?' '+fA(Math.abs(ch)):''}</span>`:'';return`<tr><td><span style="font-family:'DM Mono',monospace;font-weight:600">${fMo(h.month)}</span></td><td style="font-family:'DM Mono',monospace">${fA2(h.balance)}</td><td style="font-family:'DM Mono',monospace;color:${C.green}">${fA(h.offset)}</td><td>${chStr}</td><td style="color:${C.muted};font-size:12px">${esc(h.note)||'—'}</td><td><button onclick="delHistory('${h.id}')" style="background:none;border:none;color:${C.muted};font-size:14px;padding:2px 6px;cursor:pointer">✕</button></td></tr>`;}).join('')}
-    </tbody></table></div><div style="font-size:11px;color:${C.muted};padding:8px 0">${hrows.length} entries · ↓ = balance dropped</div>`;
-
-  // ── Extra payments table ────────────────────────────────────────────────────
-  const erows=[...D.repayments].sort((a,b)=>b.date.localeCompare(a.date));
-  const total=D.repayments.reduce((s,r)=>s+r.amount,0);
-  const TC={offset:C.blue,principal:C.green,lump:C.amber,windfall:C.purple};
-  const TL={offset:'Offset',principal:'Repayment',lump:'Lump Sum',windfall:'Windfall'};
-  const extraTable=erows.length===0?`<p style="color:${C.muted};font-size:13px;padding:20px 0">No extra payments logged yet.</p>`
-    :`<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Description</th><th></th></tr></thead><tbody>
-    ${erows.map(r=>`<tr><td style="font-family:'DM Mono',monospace">${new Date(r.date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</td><td style="font-family:'DM Mono',monospace;font-weight:700;color:${C.green}">${fA(r.amount)}</td><td><span class="tag" style="background:${(TC[r.type]||C.muted)}20;color:${TC[r.type]||C.muted}">${TL[r.type]||r.type}</span></td><td style="color:${C.muted}">${esc(r.description)||'—'}</td><td><button onclick="delRepayment('${r.id}')" style="background:none;border:none;color:${C.muted};font-size:14px;padding:2px 6px;cursor:pointer">✕</button></td></tr>`).join('')}
-    </tbody></table></div>${total>0?`<div style="font-size:13px;color:${C.green};font-family:'DM Mono',monospace;font-weight:700;padding-top:8px">${fA(total)} total extra logged</div>`:''}`;
-
-  const section=(icon,title,content)=>`<div style="margin-bottom:32px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid ${C.border}">
-      <span style="font-size:18px">${icon}</span>
-      <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0">${title}</h2>
+  // slider with inline text input
+  const slRow=(sid,iid,label,val,max,step,col)=>`<div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:12px;color:#94a3b8">${label}</span>
+      <div style="display:flex;align-items:center;gap:3px;background:rgba(0,0,0,.3);border:1px solid ${col}50;border-radius:8px;padding:3px 8px">
+        <span style="font-family:'DM Mono',monospace;font-size:13px;color:#4b5674">$</span>
+        <input id="${iid}" type="text" inputmode="numeric" value="${val.toLocaleString('en-AU')}" style="background:transparent;border:none;font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:${col};width:68px;outline:none;text-align:right;padding:0">
+      </div>
     </div>
-    ${content}
+    <input id="${sid}" type="range" min="0" max="${max}" step="${step}" value="${Math.min(val,max)}" style="width:100%;accent-color:${col}">
+  </div>`;
+
+  // ── Suggestions ──────────────────────────────────────────────────────────
+  const wk50mo=Math.round(50*52/12),wk100mo=Math.round(100*52/12);
+  const sv=r=>({mo:isFinite(base.months)&&isFinite(r.months)?base.months-r.months:0,int:isFinite(base.totalInt)&&isFinite(r.totalInt)?base.totalInt-r.totalInt:0});
+  const SUGG=bal>0?[
+    {icon:'🔄',col:'#38bdf8',title:'Switch to fortnightly',detail:`Pay ${fA(Math.round(pmt/2))} per fortnight — 26 payments/year, one free extra annually.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2,ppy:26}),act:{e:0,f:true,l:0}},
+    {icon:'☕',col:'#fb923c',title:'Add $50 per week',detail:`${fA(wk50mo)}/month extra — small but compounding.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk50mo,ppy:12}),act:{e:wk50mo,f:false,l:0}},
+    {icon:'💪',col:'#00d68f',title:'Add $100 per week',detail:`${fA(wk100mo)}/month extra — a meaningful step.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt+wk100mo,ppy:12}),act:{e:wk100mo,f:false,l:0}},
+    {icon:'🎁',col:'#fbbf24',title:'Put your tax refund at it each year',detail:`$3,000 annual lump sum — no change to monthly budget.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12,lump:3000}),act:{e:0,f:false,l:3000}},
+    {icon:'🪣',col:'#c084fc',title:'Grow your offset by $10,000',detail:`Saves ${fA(10000*rate/100)}/yr — and it's still your money.`,r:amort({balance:bal,offset:off+10000,ratePA:rate,pmt,ppy:12}),act:null},
+    {icon:'🚀',col:'#00d68f',title:'Fortnightly + $50/week',detail:`Both strategies combined for maximum compound effect.`,r:amort({balance:bal,offset:off,ratePA:rate,pmt:pmt/2+wk50mo/2,ppy:26}),act:{e:wk50mo,f:true,l:0}},
+  ]:[];
+  const suggHTML=SUGG.length?SUGG.map(s=>{
+    const{mo,int}=sv(s.r);
+    const badge=(t,c)=>`<span style="padding:4px 10px;border-radius:6px;background:${c}20;color:${c};font-size:12px;font-weight:700;font-family:'DM Mono',monospace">${t}</span>`;
+    return`<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-left:3px solid ${s.col};border-radius:12px;padding:14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px">
+      <div style="font-size:20px;flex-shrink:0">${s.icon}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px;margin-bottom:3px">${s.title}</div>
+        <div style="font-size:12px;color:#4b5674;margin-bottom:8px;line-height:1.5">${s.detail}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          ${mo>0?badge('⏱ '+fY(mo)+' sooner','#00d68f'):''}${int>0?badge('💰 Save '+fA(int),'#00d68f'):''}
+          ${s.act?`<button onclick="goToCalc(${s.act.e},${s.act.f},${s.act.l})" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:#4b5674;font-size:12px;cursor:pointer">Try in calculator →</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join(''):`<p style="color:#4b5674;font-size:13px">Enter your loan details in Settings to see suggestions.</p>`;
+
+  // ── Extra payments ────────────────────────────────────────────────────────
+  const erows=[...D.repayments].sort((a,b)=>b.date.localeCompare(a.date));
+  const etotal=D.repayments.reduce((s,r)=>s+r.amount,0);
+  const TC={offset:'#38bdf8',principal:'#00d68f',lump:'#fbbf24',windfall:'#c084fc'};
+  const TL={offset:'Offset',principal:'Repayment',lump:'Lump Sum',windfall:'Windfall'};
+  const extraHTML=`<div style="background:linear-gradient(135deg,rgba(0,214,143,.07),rgba(56,189,248,.03));border:1px solid rgba(0,214,143,.2);border-radius:12px;padding:16px;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;color:#00d68f;margin-bottom:12px">Log a separate extra payment</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-bottom:12px">
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Date</label><input id="e-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Amount ($)</label><input id="e-amt" placeholder="e.g. 5000" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Type</label><select id="e-type" style="${INP_str}"><option value="offset">Added to Offset</option><option value="principal">Extra Repayment</option><option value="lump">Annual Lump Sum</option><option value="windfall">Windfall</option></select></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Description</label><input id="e-desc" placeholder="e.g. Tax refund" style="${INP_str}"></div>
+    </div>
+    ${pbtn('✓ Log','e-save','#00d68f')}
+    <p style="font-size:11px;color:#4b5674;margin-top:10px;margin-bottom:0">Use this for separate transfers — tax refunds, bonuses, windfalls. Regular payments are logged automatically from the Dashboard.</p>
+  </div>
+  ${erows.length===0?`<p style="color:#4b5674;font-size:13px;padding:4px 0">No extra payments yet.</p>`
+    :`<div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Description</th><th></th></tr></thead><tbody>
+    ${erows.map(r=>`<tr><td style="font-family:'DM Mono',monospace">${new Date(r.date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</td><td style="font-family:'DM Mono',monospace;font-weight:700;color:#00d68f">${fA(r.amount)}</td><td><span class="tag" style="background:${(TC[r.type]||'#4b5674')}20;color:${TC[r.type]||'#4b5674'}">${TL[r.type]||r.type}</span></td><td style="color:#4b5674">${esc(r.description)||'—'}</td><td><button onclick="delRepayment('${r.id}')" style="background:none;border:none;color:#4b5674;font-size:18px;padding:2px 8px;cursor:pointer">✕</button></td></tr>`).join('')}
+    </tbody></table></div>${etotal>0?`<div style="font-size:13px;color:#00d68f;font-family:'DM Mono',monospace;font-weight:700;padding-top:8px">${fA(etotal)} total</div>`:''}`}`;
+
+  // ── History ───────────────────────────────────────────────────────────────
+  const hrows=[...D.history].sort((a,b)=>b.month.localeCompare(a.month));
+  const histHTML=hrows.length===0?`<p style="color:#4b5674;font-size:13px;padding:4px 0">No payments recorded yet.</p>`
+    :`<div style="overflow-x:auto"><table><thead><tr><th>Month</th><th>Balance</th><th>Offset</th><th>Change</th><th></th></tr></thead><tbody>
+    ${hrows.map((h,i)=>{const nx=hrows[i+1],ch=nx?h.balance-nx.balance:null;const chStr=ch!=null?`<span style="font-family:'DM Mono',monospace;color:${ch>0?'#00d68f':'#f87171'};font-weight:600">${ch>0?'↓':ch<0?'↑':'–'}${ch!==0?' '+fA(Math.abs(ch)):''}</span>`:'';return`<tr><td><span style="font-family:'DM Mono',monospace;font-weight:600">${fMo(h.month)}</span></td><td style="font-family:'DM Mono',monospace">${fA2(h.balance)}</td><td style="font-family:'DM Mono',monospace;color:#00d68f">${fA(h.offset)}</td><td>${chStr}</td><td><button onclick="delHistory('${h.id}')" style="background:none;border:none;color:#4b5674;font-size:18px;padding:2px 8px;cursor:pointer" title="Delete this entry">✕</button></td></tr>`;}).join('')}
+    </tbody></table></div><div style="font-size:11px;color:#4b5674;padding:8px 0">${hrows.length} entries · tap ✕ to delete</div>`;
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  const settHTML=`<div class="card" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px">Loan Details</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Loan Balance ($)</label><input id="s-bal" value="${l.balance?Math.round(l.balance*100)/100:''}" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Offset Balance ($)</label><input id="s-off" value="${l.offset?Math.round(l.offset*100)/100:''}" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Interest Rate (% p.a.)</label><input id="s-rate" value="${l.rate||''}" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Monthly Repayment ($)</label><input id="s-pmt" value="${l.payment||''}" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Original Loan Amount ($)</label><input id="s-orig" value="${l.origBalance||''}" style="${INP_str}"></div>
+      <div><label style="font-size:11px;color:#4b5674;display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label><input id="s-end" value="${l.origEnd||''}" style="${INP_str}"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      ${pbtn('💾 Save Loan Details','s-save','#38bdf8')}
+      <span id="s-msg" style="font-size:12px;color:#00d68f;font-family:'DM Mono',monospace"></span>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">Data</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${pbtn('⬇ Export Backup','s-export','#00d68f')}
+      ${pbtn('⬆ Import','s-import','#38bdf8')}
+      <button id="s-reset" style="padding:10px 18px;border-radius:8px;border:1px solid rgba(248,113,113,.4);background:rgba(248,113,113,.1);color:#f87171;font-weight:700;font-size:14px;cursor:pointer">🗑 Reset</button>
+    </div>
   </div>`;
 
   return`<div>
-
-  ${section('💡','Suggestions',suggCards||`<p style="color:${C.muted};font-size:13px">Enter your loan details in Settings to see personalised suggestions.</p>`)}
-
-  ${section('🧮','Scenarios & Calculator',`
-    <div style="background:linear-gradient(135deg,rgba(56,189,248,.07),rgba(192,132,252,.04));border:1px solid rgba(56,189,248,.2);border-radius:18px;padding:20px;margin-bottom:16px">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-bottom:16px">
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:#94a3b8">Extra / month</span><span id="c-extra-lbl" style="font-family:'DM Mono',monospace;font-weight:700;color:${C.blue};font-size:13px">${fA(CXe.extra)}</span></div>
-          <input id="c-extra" type="range" min="0" max="2000" step="50" value="${CXe.extra}" style="width:100%;accent-color:${C.blue}">
-          <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:3px"><span>$0</span><span>$1,000</span><span>$2,000</span></div>
+    ${collSec('calc','🧮','Scenarios & Calculator',`
+      <div style="background:linear-gradient(135deg,rgba(56,189,248,.07),rgba(192,132,252,.04));border:1px solid rgba(56,189,248,.2);border-radius:12px;padding:18px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-bottom:16px">
+          ${slRow('c-extra','c-extra-inp','Extra repayment / month',CXe.extra,2000,50,'#38bdf8')}
+          ${slRow('c-lump','c-lump-inp','Annual lump sum',CXe.lump,15000,500,'#fbbf24')}
         </div>
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:#94a3b8">Annual lump sum</span><span id="c-lump-lbl" style="font-family:'DM Mono',monospace;font-weight:700;color:${C.amber};font-size:13px">${fA(CXe.lump)}</span></div>
-          <input id="c-lump" type="range" min="0" max="15000" step="500" value="${CXe.lump}" style="width:100%;accent-color:${C.amber}">
-          <div style="display:flex;justify-content:space-between;font-size:10px;color:${C.muted};margin-top:3px"><span>$0</span><span>$7.5K</span><span>$15K</span></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+          <button id="c-fn" style="padding:8px 18px;border-radius:50px;border:none;background:${CXe.fn?'#38bdf8':'rgba(255,255,255,.09)'};color:${CXe.fn?'#07090f':'#94a3b8'};font-weight:700;font-size:13px;cursor:pointer">${CXe.fn?'✓ Fortnightly ON':'Switch to Fortnightly?'}</button>
         </div>
+        <div id="calc-res" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;background:rgba(0,0,0,.2);border-radius:12px;padding:14px;margin-bottom:14px">
+          ${[['Pays off',fD(cproj.months)],['Time left',fY(cproj.months)],['Sooner',cmoS>1?fY(cmoS)+' sooner':'—'],['Int. saved',cintS>100?fA(cintS):'—']].map(([l,v])=>`<div style="text-align:center"><div style="font-size:9px;color:#4b5674;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${l}</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#00d68f">${v}</div></div>`).join('')}
+        </div>
+        ${pbtn('💾 Save as My Strategy','c-save','#00d68f')}
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-        <button id="c-fn" style="padding:8px 18px;border-radius:50px;border:none;background:${CXe.fn?C.blue:'rgba(255,255,255,.09)'};color:${CXe.fn?'#07090f':'#94a3b8'};font-weight:700;font-size:13px">${CXe.fn?'✓ Fortnightly ON':'Switch to Fortnightly?'}</button>
-      </div>
-      <div id="calc-res" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;background:rgba(0,0,0,.2);border-radius:12px;padding:14px">
-        ${[['Pays off',fD(cproj.months)],['Time left',fY(cproj.months)],['Sooner',cmoS>1?fY(cmoS)+' sooner':'—'],['Int. saved',cintS>100?fA(cintS):'—']].map(([l,v])=>`<div style="text-align:center"><div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${l}</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:${C.green}">${v}</div></div>`).join('')}
-      </div>
-      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-        ${pbtn('💾 Save as My Strategy','c-save',C.green)}
-      </div>
-    </div>
-    <div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:14px 16px 8px"><div style="font-weight:600;font-size:14px;margin-bottom:2px">Annual Lump Sum Reference</div><p style="font-size:12px;color:${C.muted};margin:0">What a yearly lump sum does to your loan</p></div>
-      <div style="overflow-x:auto"><table><thead><tr><th>Per Year</th><th>Pays Off</th><th>Duration</th><th>Time Saved</th><th>Int. Saved</th></tr></thead><tbody>${lumpRows}</tbody></table></div>
-    </div>
-  `)}
-
-  ${section('➕','Extra Payments',`
-    <div style="background:linear-gradient(135deg,rgba(0,214,143,.07),rgba(56,189,248,.03));border:1px solid rgba(0,214,143,.2);border-radius:18px;padding:20px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;color:${C.green};margin-bottom:14px">Log a separate extra payment</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Date</label><input id="e-date" type="date" value="${new Date().toISOString().split('T')[0]}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Amount ($)</label><input id="e-amt" placeholder="e.g. 5000" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Type</label><select id="e-type" style="${INP}"><option value="offset">Added to Offset</option><option value="principal">Extra Repayment</option><option value="lump">Annual Lump Sum</option><option value="windfall">Windfall</option></select></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Description</label><input id="e-desc" placeholder="e.g. Tax refund" style="${INP}"></div>
-      </div>
-      ${pbtn('✓ Log Extra Payment','e-save',C.green)}
-      <p style="font-size:11px;color:${C.muted};margin-top:10px;margin-bottom:0">Use this for separate transfers — tax refunds, bonuses, lump sums. Your regular payment (even if rounded up) is logged in the Dashboard.</p>
-    </div>
-    ${extraTable}
-  `)}
-
-  ${section('📅','Payment History',histTable)}
-
-  ${section('⚙️','Settings',`
-    <div class="card" style="margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:14px">Loan Details</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px">
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Loan Balance ($)</label><input id="s-bal" value="${l.balance?Math.round(l.balance*100)/100:''}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Offset Balance ($)</label><input id="s-off" value="${l.offset?Math.round(l.offset*100)/100:''}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Interest Rate (% p.a.)</label><input id="s-rate" value="${l.rate||''}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Monthly Repayment ($)</label><input id="s-pmt" value="${l.payment||''}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original Loan Amount ($)</label><input id="s-orig" value="${l.origBalance||''}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Original End Date (YYYY-MM)</label><input id="s-end" value="${l.origEnd||''}" style="${INP}"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        ${pbtn('💾 Save Loan Details','s-save',C.blue)}
-        <span id="s-msg" style="font-size:12px;color:${C.green};font-family:'DM Mono',monospace"></span>
-      </div>
-    </div>
-    <div class="card">
-      <div style="font-size:13px;font-weight:700;margin-bottom:6px">Data</div>
-      <p style="font-size:12px;color:${C.muted};margin:0 0 14px;line-height:1.6">Data lives in this browser. Export regularly as a backup.</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${pbtn('⬇ Export Backup','s-export',C.green)}
-        ${pbtn('⬆ Import','s-import',C.blue)}
-        <button id="s-reset" style="padding:10px 18px;border-radius:8px;border:1px solid ${C.red}40;background:rgba(248,113,113,.1);color:${C.red};font-weight:700;font-size:14px">🗑 Reset</button>
-      </div>
-    </div>
-  `)}
-
-</div>`;
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 16px 8px"><div style="font-weight:600;font-size:14px;margin-bottom:2px">Annual Lump Sum Reference</div><p style="font-size:12px;color:#4b5674;margin:0">What a yearly lump sum does to your loan</p></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Per Year</th><th>Pays Off</th><th>Duration</th><th>Time Saved</th><th>Int. Saved</th></tr></thead><tbody>${LUMPROWS}</tbody></table></div>
+      </div>`)}
+    ${collSec('sugg','💡','Suggestions',suggHTML)}
+    ${collSec('extra','➕','Extra Payments',extraHTML)}
+    ${collSec('hist','📅','Payment History',histHTML)}
+    ${collSec('sett','⚙️','Settings',settHTML)}
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -468,13 +470,9 @@ function attachEvents(){
   });
 
   // ── Calculator (Tools) ─────────────────────────────────────────────
-  const CX=window._CX||{extra:0,lump:0,fn:false};
+  const CX=window._CX||{extra:D.strategy.extraMonthly||0,lump:D.strategy.annualLump||0,fn:D.strategy.fortnightly||false};
   if(!window._CX)window._CX=CX;
   function updateCalc(){
-    CX.extra=+(document.getElementById('c-extra')?.value||0);
-    CX.lump=+(document.getElementById('c-lump')?.value||0);
-    const lbl=document.getElementById('c-extra-lbl'),llbl=document.getElementById('c-lump-lbl');
-    if(lbl)lbl.textContent=fA(CX.extra);if(llbl)llbl.textContent=fA(CX.lump);
     const l=D.loan,bal=l.balance,off=l.offset,rate=l.rate||6.04,pmt=l.payment||5832;
     const base=bal>0?amort({balance:bal,offset:off,ratePA:rate,pmt,ppy:12}):{months:Infinity,totalInt:Infinity};
     const cpmt=CX.fn?(pmt+CX.extra)/2:(pmt+CX.extra),cppy=CX.fn?26:12;
@@ -482,13 +480,20 @@ function attachEvents(){
     const moS=isFinite(base.months)&&isFinite(cproj.months)?base.months-cproj.months:0;
     const intS=isFinite(base.totalInt)&&isFinite(cproj.totalInt)?base.totalInt-cproj.totalInt:0;
     const el=document.getElementById('calc-res');
-    if(el)el.innerHTML=[['Pays off',fD(cproj.months)],['Time left',fY(cproj.months)],['Sooner',moS>1?fY(moS)+' sooner':'—'],['Int. saved',intS>100?fA(intS):'—']].map(([l,v])=>`<div style="text-align:center"><div style="font-size:9px;color:${C.muted};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${l}</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:${C.green}">${v}</div></div>`).join('');
+    if(el)el.innerHTML=[['Pays off',fD(cproj.months)],['Time left',fY(cproj.months)],['Sooner',moS>1?fY(moS)+' sooner':'—'],['Int. saved',intS>100?fA(intS):'—']].map(([lbl,v])=>`<div style="text-align:center"><div style="font-size:9px;color:#4b5674;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px">${lbl}</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#00d68f">${v}</div></div>`).join('');
   }
-  document.getElementById('c-extra')?.addEventListener('input',updateCalc);
-  document.getElementById('c-lump')?.addEventListener('input',updateCalc);
+  function syncSlider(sid,iid,maxV,key,col){
+    const sl=document.getElementById(sid),inp=document.getElementById(iid);
+    if(!sl||!inp)return;
+    sl.addEventListener('input',function(){CX[key]=+this.value;if(document.activeElement!==inp)inp.value=CX[key].toLocaleString('en-AU');inp.style.color=col;updateCalc();});
+    inp.addEventListener('input',function(){const r=this.value.replace(/[^0-9]/g,'');if(!r)return;CX[key]=+r;sl.value=Math.min(+r,maxV);updateCalc();});
+    inp.addEventListener('blur',function(){const v=Math.min(+(this.value.replace(/[^0-9]/g,'')||0),maxV);CX[key]=v;this.value=v.toLocaleString('en-AU');sl.value=v;updateCalc();});
+  }
+  syncSlider('c-extra','c-extra-inp',2000,'extra','#38bdf8');
+  syncSlider('c-lump','c-lump-inp',15000,'lump','#fbbf24');
   document.getElementById('c-fn')?.addEventListener('click',function(){
     CX.fn=!CX.fn;this.textContent=CX.fn?'✓ Fortnightly ON':'Switch to Fortnightly?';
-    this.style.background=CX.fn?C.blue:'rgba(255,255,255,.09)';this.style.color=CX.fn?'#07090f':'#94a3b8';
+    this.style.background=CX.fn?'#38bdf8':'rgba(255,255,255,.09)';this.style.color=CX.fn?'#07090f':'#94a3b8';
     updateCalc();
   });
   document.getElementById('c-save')?.addEventListener('click',()=>{
