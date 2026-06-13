@@ -132,6 +132,29 @@ const pbtn=(l,id,bg)=>`<button id="${id}" style="padding:9px 18px;border-radius:
 const gbtn=(l,id,col)=>`<button id="${id}" style="padding:9px 18px;border-radius:8px;border:1px solid ${col}40;background:${col}15;color:${col};font-weight:600;font-size:13px">${l}</button>`;
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
+// ── TRANSFER REMINDER ────────────────────────────────────────────────────────
+function getPendingTransfers(){
+  return D.history.filter(h=>h.extra>0&&!h.extraTransferred);
+}
+
+function reminderBanner(){
+  const pending=getPendingTransfers();
+  if(!pending.length)return'';
+  return pending.map(p=>`
+    <div style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);border-radius:14px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:flex-start;gap:14px">
+      <span style="font-size:22px;flex-shrink:0">⏰</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px;color:${C.amber};margin-bottom:5px">Transfer Reminder — ${fMo(p.month)}</div>
+        <p style="font-size:13px;color:${C.muted};margin:0 0 12px;line-height:1.6">
+          You paid <strong style="color:${C.text}">${fA(p.extra)}</strong> above your minimum repayment in ${fMo(p.month)}.
+          That extra amount is currently sitting in your <strong style="color:${C.text}">offset account</strong> — it's saving you interest but your actual loan balance hasn't changed.
+          To reduce the principal, log into your bank and transfer <strong style="color:${C.amber}">${fA(p.extra)}</strong> directly to your loan account.
+        </p>
+        <button onclick="markTransferred('${p.id}')" style="padding:8px 18px;border-radius:8px;border:none;background:${C.amber};color:#07090f;font-weight:700;font-size:13px;cursor:pointer;font-family:'Mulish',sans-serif">✓ Done — I've transferred it to the loan</button>
+      </div>
+    </div>`).join('');
+}
+
 function renderDash(){
   const l=D.loan,hist=D.history;
   const{balance:bal,offset:off,rate}=l;
@@ -179,6 +202,7 @@ function renderDash(){
 
   return`<div>
 ${loanForm}
+${reminderBanner()}
 <div class="stat-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
   ${stat('Current Balance',fA(bal),`as of ${fMo(nowYM())}`,C.red)}
   ${stat('Effective Balance',fA(eff),`Offset: ${fA(off)}`,C.blue)}
@@ -323,6 +347,7 @@ function renderTrack(){
     </div>`;
 
   return`<div>
+${reminderBanner()}
 <div style="margin-bottom:18px">
   <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px">📅 Log a Payment</h2>
   <p style="font-size:12px;color:${C.muted};margin:0">Enter what you paid — the dashboard works out the rest.</p>
@@ -858,6 +883,7 @@ function attachEvents(){
     const n=document.getElementById('h-note')?.value.trim()||'';
     if(!newBal||!paid)return;
     const entry={id:gid(),month:m,balance:newBal,offset:off,rate:rate,note:n};
+    if(extra>0){entry.extra=extra;entry.extraTransferred=false;}
     const idx=D.history.findIndex(h=>h.month===m);
     if(idx>=0)D.history[idx]={...D.history[idx],...entry,id:D.history[idx].id};
     else D.history=[...D.history,entry].sort((a,b_)=>a.month.localeCompare(b_.month));
@@ -935,6 +961,11 @@ function attachEvents(){
 }
 
 // ── GLOBAL HANDLERS (called via onclick in innerHTML) ─────────────────────────
+window.markTransferred=id=>{
+  const e=D.history.find(h=>h.id===id);
+  if(e){e.extraTransferred=true;}
+  saveData();renderApp();
+};
 window.delHistory=id=>{D.history=D.history.filter(h=>h.id!==id);saveData();setTab('track');};
 window.delRepayment=id=>{D.repayments=D.repayments.filter(r=>r.id!==id);saveData();setTab('extra');};
 window.goToCalc=(extra,fn,lump)=>{CX.extra=extra;CX.fn=!!fn;CX.lump=lump;setTab('calc');};
