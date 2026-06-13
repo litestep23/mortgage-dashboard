@@ -280,16 +280,16 @@ function renderTrack(){
   const lastEntry=D.history.length>0?D.history[D.history.length-1]:D.loan;
   const lastBal=lastEntry.balance||D.loan.balance||0;
   const lastOff=lastEntry.offset||D.loan.offset||0;
-  const rate=D.loan.rate||6.04, basePmt=D.loan.payment||5832;
+  const rate=D.loan.rate||6.04, minPmt=D.loan.payment||5832;
 
-  // Initial preview calc
-  function calcPmt(bal,off,r,pmt,extra){
+  function calcPmt(bal,off,r,paid){
     const int=Math.max(0,bal-off)*r/100/12;
-    const principal=Math.max(0,pmt-int);
-    const newBal=Math.max(0,bal-principal-(extra||0));
-    return{int,principal,newBal};
+    const principal=Math.max(0,paid-int);
+    const newBal=Math.max(0,bal-principal);
+    const extra=Math.max(0,paid-minPmt);
+    return{int,principal,newBal,extra};
   }
-  const init=calcPmt(lastBal,lastOff,rate,basePmt,0);
+  const init=calcPmt(lastBal,lastOff,rate,minPmt);
 
   const rows=[...D.history].sort((a,b)=>b.month.localeCompare(a.month));
   const tableRows=rows.map((h,i)=>{
@@ -306,44 +306,50 @@ function renderTrack(){
     </tr>`;
   }).join('');
 
-  const previewHTML=(int,principal,extra,newBal)=>`
-    <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">How it's calculated</div>
+  const previewHTML=(int,principal,paid,extra,newBal)=>`
+    <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
     ${kv('Starting balance',fA(lastBal))}
-    ${kv('Interest this month','− '+fA(int),C.red)}
-    ${kv('Your repayment','+ '+fA(basePmt),C.blue)}
-    ${extra>0?kv('Extra payment','− '+fA(extra),C.green):''}
-    <div style="border-top:1px solid ${C.border};margin:10px 0 0;padding-top:10px">
-      ${kv('New loan balance',fA(newBal),C.green)}
-      <div style="font-size:11px;color:${C.muted};margin-top:4px">Principal paid this month: ${fA(principal)}</div>
+    ${kv('Interest charged','− '+fA(int),C.red)}
+    ${kv('You paid','+ '+fA(paid),C.blue)}
+    <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
+      ${kv('Principal paid',fA(principal),C.green)}
+      ${extra>0?`<div style="margin-top:6px;padding:8px 10px;background:rgba(0,214,143,.08);border-radius:8px;font-size:12px;color:#6ee7b7">
+        ✓ <strong>${fA(extra)}</strong> above your minimum — automatically logged as extra repayment
+      </div>`:''}
+    </div>
+    <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:${C.muted}">New loan balance</span>
+      <span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${C.green}">${fA(newBal)}</span>
     </div>`;
 
   return`<div>
 <div style="margin-bottom:18px">
   <h2 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px">📅 Log a Payment</h2>
-  <p style="font-size:12px;color:${C.muted};margin:0">Just enter what you paid — the new balance is calculated automatically.</p>
+  <p style="font-size:12px;color:${C.muted};margin:0">Enter what you paid — the dashboard works out the rest.</p>
 </div>
 <div style="background:linear-gradient(135deg,rgba(56,189,248,.07),rgba(192,132,252,.03));border:1px solid rgba(56,189,248,.2);border-radius:18px;padding:22px;margin-bottom:24px">
   <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
     <div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:16px">
         <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Month</label>
           <input id="h-month" type="month" value="${nowYM()}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Regular repayment ($)</label>
-          <input id="h-pmt" value="${basePmt}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Extra payment ($) <span style="color:${C.muted};font-weight:400">optional</span></label>
-          <input id="h-extra" value="0" placeholder="0" style="${INP}"></div>
+        <div>
+          <label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">How much did you pay? ($)</label>
+          <input id="h-paid" value="${minPmt}" style="${INP}">
+          <div style="font-size:10px;color:${C.muted};margin-top:4px">Minimum is ${fA(minPmt)} — just enter whatever you paid</div>
+        </div>
         <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Offset balance ($)</label>
           <input id="h-off" value="${Math.round(lastOff)}" style="${INP}"></div>
-        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Note <span style="color:${C.muted};font-weight:400">optional</span></label>
-          <input id="h-note" placeholder="e.g. Paid extra this month" style="${INP}"></div>
+        <div><label style="font-size:11px;color:${C.muted};display:block;margin-bottom:5px">Note <span style="font-weight:400">optional</span></label>
+          <input id="h-note" placeholder="e.g. Rate dropped" style="${INP}"></div>
       </div>
       ${pbtn('✓ Record Payment','h-save',C.green)}
+      <p style="font-size:11px;color:${C.muted};margin-top:10px;margin-bottom:0">Based on last recorded balance of <strong style="color:${C.text}">${fA(lastBal)}</strong></p>
     </div>
     <div id="h-preview" style="background:rgba(0,0,0,.2);border-radius:12px;padding:16px">
-      ${previewHTML(init.int,init.principal,0,init.newBal)}
+      ${previewHTML(init.int,init.principal,minPmt,0,init.newBal)}
     </div>
   </div>
-  <p style="font-size:11px;color:${C.muted};margin-top:14px;margin-bottom:0">Starting from your last recorded balance of <strong style="color:${C.text}">${fA(lastBal)}</strong>. Interest is calculated at ${rate}% on your effective balance (loan minus offset).</p>
 </div>
 ${rows.length===0
   ?`<div style="text-align:center;padding:30px 0;color:${C.muted};font-size:13px">No payments recorded yet — log your first one above ↑</div>`
@@ -787,42 +793,45 @@ function attachEvents(){
     const lastEntry=D.history.length>0?D.history[D.history.length-1]:D.loan;
     const lastBal=lastEntry.balance||D.loan.balance||0;
     const off=parseFloat((document.getElementById('h-off')?.value||'').replace(/[^0-9.]/g,''))||lastEntry.offset||D.loan.offset||0;
-    const pmt=parseFloat((document.getElementById('h-pmt')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment||5832;
-    const extra=parseFloat((document.getElementById('h-extra')?.value||'').replace(/[^0-9.]/g,''))||0;
-    const rate=D.loan.rate||6.04;
+    const paid=parseFloat((document.getElementById('h-paid')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment||5832;
+    const rate=D.loan.rate||6.04, minPmt=D.loan.payment||5832;
     const int=Math.max(0,lastBal-off)*rate/100/12;
-    const principal=Math.max(0,pmt-int);
-    const newBal=Math.max(0,lastBal-principal-extra);
+    const principal=Math.max(0,paid-int);
+    const newBal=Math.max(0,lastBal-principal);
+    const extra=Math.max(0,paid-minPmt);
     const el=document.getElementById('h-preview');
     if(el)el.innerHTML=`
-      <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">How it's calculated</div>
+      <div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Breakdown</div>
       ${kv('Starting balance',fA(lastBal))}
-      ${kv('Interest this month','− '+fA(int),C.red)}
-      ${kv('Your repayment','+ '+fA(pmt),C.blue)}
-      ${extra>0?kv('Extra payment','− '+fA(extra),C.green):''}
-      <div style="border-top:1px solid ${C.border};margin:10px 0 0;padding-top:10px">
-        ${kv('New loan balance',fA(newBal),C.green)}
-        <div style="font-size:11px;color:${C.muted};margin-top:4px">Principal paid: ${fA(principal)}</div>
+      ${kv('Interest charged','− '+fA(int),C.red)}
+      ${kv('You paid','+ '+fA(paid),C.blue)}
+      <div style="border-top:1px solid ${C.border};margin:10px 0;padding-top:10px">
+        ${kv('Principal paid',fA(principal),C.green)}
+        ${extra>0?`<div style="margin-top:6px;padding:8px 10px;background:rgba(0,214,143,.08);border-radius:8px;font-size:12px;color:#6ee7b7">
+          ✓ <strong>${fA(extra)}</strong> above minimum — auto-logged as extra repayment
+        </div>`:''}
+      </div>
+      <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:10px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:${C.muted}">New loan balance</span>
+        <span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:${C.green}">${fA(newBal)}</span>
       </div>`;
-    return{newBal,off,rate};
+    return{newBal,off,rate,paid,extra};
   }
-  ['h-pmt','h-extra','h-off'].forEach(id=>{
+  ['h-paid','h-off'].forEach(id=>{
     document.getElementById(id)?.addEventListener('input', updateHPreview);
   });
 
   document.getElementById('h-save')?.addEventListener('click',()=>{
-    const{newBal,off,rate}=updateHPreview();
+    const{newBal,off,rate,paid,extra}=updateHPreview();
     const m=document.getElementById('h-month')?.value||nowYM();
     const n=document.getElementById('h-note')?.value.trim()||'';
-    const pmt=parseFloat((document.getElementById('h-pmt')?.value||'').replace(/[^0-9.]/g,''))||D.loan.payment||5832;
-    const extra=parseFloat((document.getElementById('h-extra')?.value||'').replace(/[^0-9.]/g,''))||0;
-    if(!newBal)return;
+    if(!newBal||!paid)return;
     const entry={id:gid(),month:m,balance:newBal,offset:off,rate:rate,note:n};
     const idx=D.history.findIndex(h=>h.month===m);
     if(idx>=0)D.history[idx]={...D.history[idx],...entry,id:D.history[idx].id};
     else D.history=[...D.history,entry].sort((a,b_)=>a.month.localeCompare(b_.month));
     D.loan.balance=newBal; D.loan.offset=off; D.loan.rate=rate;
-    if(extra>0) D.repayments.push({id:gid(),date:new Date().toISOString().split('T')[0],amount:extra,description:'Extra payment — '+fMo(m),type:'principal'});
+    if(extra>0) D.repayments.push({id:gid(),date:new Date().toISOString().split('T')[0],amount:extra,description:'Extra in regular payment — '+fMo(m),type:'principal'});
     saveData(); setTab('track');
   });
 
