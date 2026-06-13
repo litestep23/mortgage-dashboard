@@ -33,11 +33,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div id="app"></div>
 <script>
 const SK='mortgageDashV1';
-const INIT={loan:{balance:928418.3,offset:78642.01,rate:6.04,payment:5832,origBalance:1025257,origEnd:'2051-09'},strategy:{extraMonthly:250,fortnightly:false,annualLump:4000},history:[],repayments:[]};
+const INIT={loan:{balance:928418.30,offset:78642.01,rate:6.04,payment:5832,origBalance:1025257,origEnd:'2051-09'},strategy:{extraMonthly:250,fortnightly:false,annualLump:4000},history:[],repayments:[]};
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
-const fA=n=>!isFinite(n)?'—':new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(n);
-const fA2=n=>!isFinite(n)?'—':new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const fA=n=>!isFinite(n)?'—':new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const fA2=fA;
 const fD=m=>{if(!isFinite(m)||m>900)return'—';const d=new Date();d.setMonth(d.getMonth()+Math.round(m));return d.toLocaleDateString('en-AU',{month:'short',year:'numeric'})};
 const fY=m=>{if(!isFinite(m)||m>900||m<0)return'—';const y=Math.floor(m/12),mo=Math.round(m%12);return y===0?`${mo}mo`:mo===0?`${y}y`:`${y}y ${mo}mo`};
 const fMo=s=>{if(!s)return'';const[y,m]=s.split('-');return new Date(+y,+m-1).toLocaleDateString('en-AU',{month:'short',year:'numeric'})};
